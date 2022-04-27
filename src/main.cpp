@@ -139,49 +139,48 @@ void setup()
 	myservo.attach(servoPin, 1000, 2000); //
 }
 
-double last_value = 0.0;
+const long NANTEMP = -100.0;
+const int period = 1000;
+unsigned long last_loop_time;;
+float last_value = NANTEMP;
+const int forced_send_period = 10000;
+unsigned long last_temp_send_time;
 
 void loop()
 {
-  sensors.requestTemperatures(); // Send the command to get temperatures
-  // After we got the temperatures, we can print them here.
-  // We use the function ByIndex, and as an example get the temperature from the first sensor only.
-  float tempC = sensors.getTempCByIndex(0);
-  char buff[30];
-  // Check if reading was successful
-  if (tempC != DEVICE_DISCONNECTED_C) {
-//    Serial.print("Temperature for the device 1 (index 0) is: ");
-//    Serial.println(tempC);
+	unsigned long now = millis();
 
-//    tft.drawFloat(tempC, tft.width()/4, tft.height() / 2, 4);
-    char symbol = ' ';
-    if(last_value != 0.0) {
-        if (tempC > last_value) {
-            symbol = '+';  
-        } else {
-            symbol = '-';
-        }
-    }
-    snprintf(buff, sizeof(buff), "%0.3f %c", tempC, symbol);
-    tft.fillScreen(TFT_BLACK);
-    tft.drawString(buff, 3, 0, 0);
-    if (client.connected()) {
-      client.publish("stillerator/status/temp0", buff);
-    }
-    last_value = tempC;
+	if (now >= last_loop_time + period) {
+		last_loop_time += period;
+   
+		sensors.requestTemperatures(); 
+		float tempC = sensors.getTempCByIndex(0);
 
 
-  //  tft.fillScreen(TFT_BLACK);
-  } else {
-    Serial.println("Error: Could not read temperature data");
-  }
-//  mqttClient.loop();
-//  espDelay(1000);
-  if (!client.connected()) {
-    reconnect();
-  }
-  client.loop();
-delay(3000);
+		if (tempC != DEVICE_DISCONNECTED_C) {
+			char buff[30];
+			float diff = last_value != NANTEMP ? tempC - last_value : 0.0;
+		
+			snprintf(buff, sizeof(buff), "%0.2f %0.2f", tempC, diff);
+			if (diff != 0.0) {
+				tft.fillScreen(TFT_BLACK);
+				tft.drawString(buff, 3, 0, 0);
+			}
+			if (!client.connected()) {
+				reconnect();
+			}
+			if (client.connected()) {
+				if (diff != 0 || !last_temp_send_time || now > last_temp_send_time + forced_send_period) {
+					client.publish("stillerator/status/temp0", buff);
+					last_temp_send_time += forced_send_period;
+				}
+			}
+			last_value = tempC;
+		} else {
+			Serial.println("Error: Could not read temperature data");
+		}
+	}
+	client.loop();
 }
 
 
