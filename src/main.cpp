@@ -11,7 +11,7 @@
 
 #include <WiFiManager.h>         //https://github.com/tzapu/WiFiManager
 #include <PubSubClient.h>
-
+#include <ArduinoJson.h>
 
 
 Servo myservo;  // create servo object to control a servo
@@ -171,7 +171,13 @@ void loop()
 			}
 			if (client.connected()) {
 				if (diff != 0 || !last_temp_send_time || now > last_temp_send_time + forced_send_period) {
-					client.publish("stillerator/status/temp0", buff);
+          StaticJsonDocument<200> doc;
+					doc["sensor"] = 0;
+          doc["temp"] = tempC;
+          doc["diff"] = diff;
+          String output;
+          serializeJson(doc, output);
+          client.publish("stillerator/status/temp", output.c_str());
 					last_temp_send_time += forced_send_period;
 				}
 			}
