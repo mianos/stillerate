@@ -143,7 +143,7 @@ const long NANTEMP = -100.0;
 const int period = 1000;
 unsigned long last_loop_time;;
 float last_value = NANTEMP;
-const int forced_send_period = 10000;
+const int forced_send_period = 30000;
 unsigned long last_temp_send_time;
 
 void loop()
@@ -151,18 +151,18 @@ void loop()
 	unsigned long now = millis();
 
 	if (now >= last_loop_time + period) {
-		last_loop_time += period;
+		last_loop_time  = now;
    
 		sensors.requestTemperatures(); 
 		float tempC = sensors.getTempCByIndex(0);
 
-
 		if (tempC != DEVICE_DISCONNECTED_C) {
-			char buff[30];
 			float diff = last_value != NANTEMP ? tempC - last_value : 0.0;
 		
-			snprintf(buff, sizeof(buff), "%0.2f %0.2f", tempC, diff);
 			if (diff != 0.0) {
+        char buff[30];
+  			snprintf(buff, sizeof(buff), "%0.2f %0.2f", tempC, diff);
+
 				tft.fillScreen(TFT_BLACK);
 				tft.drawString(buff, 3, 0, 0);
 			}
@@ -170,15 +170,20 @@ void loop()
 				reconnect();
 			}
 			if (client.connected()) {
-				if (diff != 0 || !last_temp_send_time || now > last_temp_send_time + forced_send_period) {
+        auto forced = now > last_temp_send_time + forced_send_period;
+				if (diff != 0 || !last_temp_send_time || forced) {
           StaticJsonDocument<200> doc;
 					doc["sensor"] = 0;
           doc["temp"] = tempC;
           doc["diff"] = diff;
+
+          if (forced) {
+            doc["forced"] = true;
+          }
           String output;
           serializeJson(doc, output);
           client.publish("stillerator/status/temp", output.c_str());
-					last_temp_send_time += forced_send_period;
+					last_temp_send_time = now;
 				}
 			}
 			last_value = tempC;
