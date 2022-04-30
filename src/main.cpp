@@ -45,8 +45,11 @@ TFT_eSPI tft = TFT_eSPI(135, 240); // Invoke custom library
 // Setup a oneWire instance to communicate with any OneWire devices (not just
 // Maxim/Dallas temperature ICs)
 OneWire oneWire(ONE_WIRE_BUS);
-// Pass our oneWire reference to Dallas Temperature.
 DallasTemperature sensors(&oneWire);
+int device_count = 0;
+DeviceAddress *sensor_addresses;
+float *last_values;
+const long NANTEMP = -100.0;
 
 int servoPin = 2;
 int pos = 0;
@@ -140,8 +143,6 @@ void setup() {
     Serial.println("\r\nFont missing in SPIFFS, did you upload it?");
     while (1)
       yield();
-  } else {
-    Serial.println("\r\nFonts found OK.");
   }
   tft.loadFont(AA_FONT_LARGE); // Must load the font first
 
@@ -150,7 +151,32 @@ void setup() {
   client.setServer(mqtt_server, 1883);
   client.setCallback(callback);
 
+  DeviceAddress dummyAddr;
+	oneWire.search(dummyAddr);
+	oneWire.reset_search();
+
   sensors.begin();
+  Serial.print("Locating devices...");
+  Serial.print("Found ");
+  device_count = sensors.getDeviceCount();
+  Serial.printf("count %d ", device_count);
+  Serial.println(" devices.");
+	sensor_addresses = new DeviceAddress[device_count];
+  last_values = new float[device_count];
+  for (int ii = 0; ii < device_count; ii++) {
+      if (!sensors.getAddress(sensor_addresses[ii], ii)) 
+        Serial.printf("Unable to find address for Device %d", ii);
+      else
+        Serial.printf("got device %d address %d\n", ii, sensor_addresses[ii]);
+      sensors.setResolution(sensor_addresses[ii], 12);
+      last_values[ii] = NANTEMP;
+  }
+  // report parasite power requirements
+  Serial.print("Parasite power is: ");
+  if (sensors.isParasitePowerMode())
+		Serial.println("ON");
+  else
+		Serial.println("OFF");
 
   ESP32PWM::allocateTimer(0);
   ESP32PWM::allocateTimer(1);
@@ -160,10 +186,8 @@ void setup() {
   myservo.attach(servoPin, 1000, 2000); //
 }
 
-const long NANTEMP = -100.0;
 const int period = 1000;
 unsigned long last_loop_time;
-float last_value = NANTEMP;
 const int forced_send_period = 30000;
 unsigned long last_temp_send_time;
 
@@ -172,45 +196,47 @@ void loop() {
 
   if (now >= last_loop_time + period) {
     last_loop_time = now;
+    if (!client.connected()) {
+      reconnect();
+    }
 
     sensors.requestTemperatures();
-    float tempC = sensors.getTempCByIndex(0);
+    for (int snum; snum < device_count; snum++) {
+      float tempC = sensors.getTempCByIndex(snum);
 
-    if (tempC != DEVICE_DISCONNECTED_C) {
-      float diff = last_value != NANTEMP ? tempC - last_value : 0.0;
+      if (tempC != DEVICE_DISCONNECTED_C) {
+        float diff = last_values[snum] != NANTEMP ? tempC - last_values[snum] : 0.0;
 
-      if (diff != 0.0) {
-        char buff[30];
-        snprintf(buff, sizeof(buff), "%0.2f %0.2f", tempC, diff);
+        if (diff != 0.0) {
+          char buff[30];
+          snprintf(buff, sizeof(buff), "%1d %0.2f %0.2f", snum, tempC, diff);
 
-        tft.fillScreen(TFT_BLACK);
-        tft.drawString(buff, 3, 0, 0);
-      }
-      if (!client.connected()) {
-        reconnect();
-      }
-      if (client.connected()) {
-        auto forced = now > last_temp_send_time + forced_send_period;
-        if (last_temp_send_time == 0 ||diff != 0 || !last_temp_send_time || forced) {
-          StaticJsonDocument<200> doc;
-          doc["sensor"] = 0;
-          doc["temp"] = tempC;
-          doc["diff"] = diff;
-
-          if (forced) {
-            doc["forced"] = true;
-          }
-          String output;
-          serializeJson(doc, output);
-          String tele_topic = String("tele/") + dname + "/temp0";
-          client.publish(tele_topic.c_str(), output.c_str());
-          last_temp_send_time = now;
+          tft.fillScreen(TFT_BLACK);
+          tft.drawString(buff, 3, 10 * snum, 0);
         }
+        if (client.connected()) {
+          auto forced = now > last_temp_send_time + forced_send_period;
+          if (last_temp_send_time == 0 ||diff != 0 || !last_temp_send_time || forced) {
+            StaticJsonDocument<200> doc;
+            doc["sensor"] = snum;
+            doc["temp"] = tempC;
+            doc["diff"] = diff;
+
+            if (forced) {
+              doc["forced"] = true;
+            }
+            String output;
+            serializeJson(doc, output);
+            String tele_topic = String("tele/") + dname + "/temp";
+            client.publish(tele_topic.c_str(), output.c_str());
+            last_temp_send_time = now;
+          }
+        }
+        last_values[snum] = tempC;
+      } else {
+        Serial.println("Error: Could not read temperature data");
       }
-      last_value = tempC;
-    } else {
-      Serial.println("Error: Could not read temperature data");
-    }
+  }
   }
   client.loop();
 }
