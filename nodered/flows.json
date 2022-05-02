@@ -1,0 +1,411 @@
+[
+    {
+        "id": "b8f36cbcfc882e5f",
+        "type": "tab",
+        "label": "Still control panel",
+        "disabled": false,
+        "info": "",
+        "env": []
+    },
+    {
+        "id": "10eeb3c284038678",
+        "type": "mqtt in",
+        "z": "b8f36cbcfc882e5f",
+        "name": "",
+        "topic": "tele/stillerator/temp",
+        "qos": "2",
+        "datatype": "json",
+        "broker": "3fe3ac59af05955a",
+        "nl": false,
+        "rap": true,
+        "rh": 0,
+        "inputs": 0,
+        "x": 150,
+        "y": 100,
+        "wires": [
+            [
+                "2b37b4a756b25825"
+            ]
+        ]
+    },
+    {
+        "id": "a6afe5491a2f9de9",
+        "type": "ui_gauge",
+        "z": "b8f36cbcfc882e5f",
+        "name": "",
+        "group": "7a9b58c9ef792628",
+        "order": 3,
+        "width": 0,
+        "height": 0,
+        "gtype": "gage",
+        "title": "Boiler Temp",
+        "label": "units",
+        "format": "{{msg.payload.temp | number: 2}}",
+        "min": "15",
+        "max": "35",
+        "colors": [
+            "#00b500",
+            "#e6e600",
+            "#ca3838"
+        ],
+        "seg1": "",
+        "seg2": "",
+        "className": "",
+        "x": 510,
+        "y": 180,
+        "wires": []
+    },
+    {
+        "id": "3f900e7c02938a0f",
+        "type": "mqtt out",
+        "z": "b8f36cbcfc882e5f",
+        "name": "",
+        "topic": "cmnd/stillerator/pump",
+        "qos": "",
+        "retain": "",
+        "respTopic": "",
+        "contentType": "",
+        "userProps": "",
+        "correl": "",
+        "expiry": "",
+        "broker": "3fe3ac59af05955a",
+        "x": 800,
+        "y": 420,
+        "wires": []
+    },
+    {
+        "id": "542c98df8fc16813",
+        "type": "ui_gauge",
+        "z": "b8f36cbcfc882e5f",
+        "name": "",
+        "group": "7a9b58c9ef792628",
+        "order": 4,
+        "width": 0,
+        "height": 0,
+        "gtype": "gage",
+        "title": "Reflux Temp",
+        "label": "units",
+        "format": "{{msg.payload.temp | number: 2}}",
+        "min": "15",
+        "max": "35",
+        "colors": [
+            "#00b500",
+            "#e6e600",
+            "#ca3838"
+        ],
+        "seg1": "",
+        "seg2": "",
+        "className": "",
+        "x": 530,
+        "y": 100,
+        "wires": []
+    },
+    {
+        "id": "2b37b4a756b25825",
+        "type": "switch",
+        "z": "b8f36cbcfc882e5f",
+        "name": "",
+        "property": "payload.sensor",
+        "propertyType": "msg",
+        "rules": [
+            {
+                "t": "eq",
+                "v": "0",
+                "vt": "num"
+            },
+            {
+                "t": "eq",
+                "v": "1",
+                "vt": "num"
+            }
+        ],
+        "checkall": "false",
+        "repair": false,
+        "outputs": 2,
+        "x": 330,
+        "y": 80,
+        "wires": [
+            [
+                "542c98df8fc16813"
+            ],
+            [
+                "a6afe5491a2f9de9"
+            ]
+        ]
+    },
+    {
+        "id": "d95ebde2288b4a3a",
+        "type": "inject",
+        "z": "b8f36cbcfc882e5f",
+        "name": "",
+        "props": [
+            {
+                "p": "payload.temp",
+                "v": "\"\"",
+                "vt": "str"
+            },
+            {
+                "p": "topic",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "x": 110,
+        "y": 180,
+        "wires": [
+            [
+                "a6afe5491a2f9de9",
+                "542c98df8fc16813"
+            ]
+        ]
+    },
+    {
+        "id": "73016bd1712174b0",
+        "type": "template",
+        "z": "b8f36cbcfc882e5f",
+        "name": "",
+        "field": "payload",
+        "fieldType": "msg",
+        "format": "handlebars",
+        "syntax": "mustache",
+        "template": "{\"number\": 0, \"speed\": {{payload}}}",
+        "output": "str",
+        "x": 620,
+        "y": 400,
+        "wires": [
+            [
+                "3f900e7c02938a0f"
+            ]
+        ]
+    },
+    {
+        "id": "0b1725c41c1af97f",
+        "type": "ui_slider",
+        "z": "b8f36cbcfc882e5f",
+        "name": "",
+        "label": "Pump 1",
+        "tooltip": "",
+        "group": "7a9b58c9ef792628",
+        "order": 2,
+        "width": 0,
+        "height": 0,
+        "passthru": false,
+        "outs": "end",
+        "topic": "value",
+        "topicType": "msg",
+        "min": 0,
+        "max": "180",
+        "step": 1,
+        "className": "",
+        "x": 480,
+        "y": 460,
+        "wires": [
+            [
+                "3c8a3ec7f081b870"
+            ]
+        ]
+    },
+    {
+        "id": "3c8a3ec7f081b870",
+        "type": "template",
+        "z": "b8f36cbcfc882e5f",
+        "name": "",
+        "field": "payload",
+        "fieldType": "msg",
+        "format": "handlebars",
+        "syntax": "mustache",
+        "template": "{\"number\": 1, \"speed\": {{payload}}}",
+        "output": "str",
+        "x": 620,
+        "y": 460,
+        "wires": [
+            [
+                "3f900e7c02938a0f"
+            ]
+        ]
+    },
+    {
+        "id": "ec64163a33c4f3a3",
+        "type": "mqtt in",
+        "z": "b8f36cbcfc882e5f",
+        "name": "",
+        "topic": "tele/stillerator/pump",
+        "qos": "2",
+        "datatype": "json",
+        "broker": "3fe3ac59af05955a",
+        "nl": false,
+        "rap": true,
+        "rh": 0,
+        "inputs": 0,
+        "x": 130,
+        "y": 340,
+        "wires": [
+            [
+                "36a399173a67f368"
+            ]
+        ]
+    },
+    {
+        "id": "36a399173a67f368",
+        "type": "switch",
+        "z": "b8f36cbcfc882e5f",
+        "name": "",
+        "property": "payload.number",
+        "propertyType": "msg",
+        "rules": [
+            {
+                "t": "eq",
+                "v": "0",
+                "vt": "num"
+            },
+            {
+                "t": "eq",
+                "v": "1",
+                "vt": "num"
+            }
+        ],
+        "checkall": "false",
+        "repair": false,
+        "outputs": 2,
+        "x": 150,
+        "y": 420,
+        "wires": [
+            [
+                "1f3de1923c9a871f"
+            ],
+            [
+                "71ca4aebb196916a"
+            ]
+        ]
+    },
+    {
+        "id": "1f3de1923c9a871f",
+        "type": "change",
+        "z": "b8f36cbcfc882e5f",
+        "name": "",
+        "rules": [
+            {
+                "t": "set",
+                "p": "payload",
+                "pt": "msg",
+                "to": "payload.speed",
+                "tot": "msg"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 320,
+        "y": 400,
+        "wires": [
+            [
+                "0c2db1d98c2c9fac"
+            ]
+        ]
+    },
+    {
+        "id": "71ca4aebb196916a",
+        "type": "change",
+        "z": "b8f36cbcfc882e5f",
+        "name": "",
+        "rules": [
+            {
+                "t": "set",
+                "p": "payload",
+                "pt": "msg",
+                "to": "payload.speed",
+                "tot": "msg"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 320,
+        "y": 460,
+        "wires": [
+            [
+                "0b1725c41c1af97f"
+            ]
+        ]
+    },
+    {
+        "id": "0c2db1d98c2c9fac",
+        "type": "ui_slider",
+        "z": "b8f36cbcfc882e5f",
+        "name": "",
+        "label": "Pump 0",
+        "tooltip": "",
+        "group": "7a9b58c9ef792628",
+        "order": 1,
+        "width": 0,
+        "height": 0,
+        "passthru": false,
+        "outs": "end",
+        "topic": "value",
+        "topicType": "msg",
+        "min": 0,
+        "max": "180",
+        "step": 1,
+        "className": "",
+        "x": 480,
+        "y": 400,
+        "wires": [
+            [
+                "73016bd1712174b0"
+            ]
+        ]
+    },
+    {
+        "id": "3fe3ac59af05955a",
+        "type": "mqtt-broker",
+        "name": "MQTT2",
+        "broker": "mqtt2.mianos.com",
+        "port": "1883",
+        "clientid": "",
+        "autoConnect": true,
+        "usetls": false,
+        "protocolVersion": "4",
+        "keepalive": "60",
+        "cleansession": true,
+        "birthTopic": "",
+        "birthQos": "0",
+        "birthPayload": "",
+        "birthMsg": {},
+        "closeTopic": "",
+        "closeQos": "0",
+        "closePayload": "",
+        "closeMsg": {},
+        "willTopic": "",
+        "willQos": "0",
+        "willPayload": "",
+        "willMsg": {},
+        "sessionExpiry": ""
+    },
+    {
+        "id": "7a9b58c9ef792628",
+        "type": "ui_group",
+        "name": "Test Group",
+        "tab": "001411fd73c52e81",
+        "order": 1,
+        "disp": true,
+        "width": "6",
+        "collapse": false,
+        "className": ""
+    },
+    {
+        "id": "001411fd73c52e81",
+        "type": "ui_tab",
+        "name": "Home",
+        "icon": "dashboard",
+        "disabled": false,
+        "hidden": false
+    }
+]
