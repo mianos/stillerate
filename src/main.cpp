@@ -14,6 +14,7 @@
 #include <PubSubClient.h>
 #include <StringSplitter.h>
 #include <WiFiManager.h>
+#include <PID_v1.h>
 
 const char *dname = "stillerator";
 
@@ -51,6 +52,13 @@ DeviceAddress *sensor_addresses;
 float *last_values;
 const long NANTEMP = -100.0;
 
+// PID vars
+//Define Variables we'll be connecting to
+double Setpoint, Input, Output;
+
+//Specify the links and initial tuning parameters
+double Kp=2, Ki=5, Kd=1;
+PID myPID(&Input, &Output, &Setpoint, Kp, Ki, Kd, P_ON_M, DIRECT);
 
 const char *mqtt_server = "mqtt2.mianos.com";
 const char* ntpServer = "ntp.mianos.com";
@@ -152,7 +160,14 @@ void callback(char *topic_str, byte *payload, unsigned int length) {
         return;
       }
       servos[number]->set(speed);
-    }
+    } else if (dest == "pid") {
+      Serial.printf("Pid control is %c\n", payload[0]);
+    } else if (dest == "setpoint") {
+      String output;
+      serializeJson(jpl, output);
+      Serial.printf("setpoint %s\n", output.c_str());
+      Setpoint = (double)jpl["setpoint"];
+    } 
   }
 }
 
@@ -180,9 +195,6 @@ void reconnect() {
       } else {
         Serial.printf("Date Now is %s\n", DateTime.toISOString().c_str());
         Serial.printf("Timestamp is %s\n", DateTime.formatUTC(DateFormatter::ISO8601).c_str());
-          time_t t = time(NULL);
-  Serial.printf("OS local:     %s", asctime(localtime(&t)));
-  Serial.printf("OS UTC:       %s", asctime(gmtime(&t)));
       }
  
     } else {
@@ -275,6 +287,9 @@ void setup() {
   for (auto ii = 0; ii < num_servos; ii++) {
     servos[ii] = new CServo(servo_pins[ii]);
   }
+  //turn the PID on
+ 
+  myPID.SetMode(AUTOMATIC);
 }
 
 const int period = 1000;
@@ -320,8 +335,16 @@ void loop() {
         tft.drawString(buff, 3, 35 * snum, 0);
         // Serial.printf("%s\n", buff);
       }
-
       tft.drawString(DateTime.format(DateFormatter::TIME_ONLY), 3, 70, 0);
+      for (int snum = 0; snum < device_count; snum++) {
+        if (drows[snum]->changed) {
+          if (snum == 0) { // sensor 0 under pid control, should be adjustable via config  
+            Input = drows[snum]->temp;
+            myPID.Compute();
+            Serial.printf("In %f Computed %f\n", Input, Output);
+          }
+        }
+      }
     }
     if (client.connected()) {
       for (int snum = 0; snum < device_count; snum++) {
@@ -349,15 +372,14 @@ void loop() {
       }
     }
     for (int snum = 0; snum < device_count; snum++) {
-      if (drows[snum]->temp != NANTEMP)
+      if (drows[snum]->temp != NANTEMP) {
         drows[snum]->last_temp = drows[snum]->temp;
+      }
       drows[snum]->changed = false;
     }
   }
-
   for (int servo = 0; servo < num_servos; servo++) {
     servos[servo]->do_update_if_needed(servo);
   }
-
   client.loop();
 }
