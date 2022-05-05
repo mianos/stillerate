@@ -9,6 +9,7 @@
 #include <WiFi.h>
 #include <Wire.h>
 
+#include <ESPDateTime.h>
 #include <ArduinoJson.h>
 #include <PubSubClient.h>
 #include <StringSplitter.h>
@@ -52,6 +53,7 @@ const long NANTEMP = -100.0;
 
 
 const char *mqtt_server = "mqtt2.mianos.com";
+const char* ntpServer = "ntp.mianos.com";
 WiFiClient espClient;
 WiFiManager wifiManager;
 PubSubClient client(espClient);
@@ -60,7 +62,7 @@ class CServo : private Servo {
   int speed;
   bool do_update;
 public:
-  CServo(int pin) : speed(90), do_update(true) {
+  CServo(int pin) : speed(0), do_update(true) {
     static bool timers_allocated = false;
     if (!timers_allocated) {
       for (auto ii = 0; ii < 4; ii++) {
@@ -73,7 +75,8 @@ public:
     write(speed);
   }
   void set(int new_speed) {
-    write(new_speed);
+    auto svalue = map(new_speed, 0, 100, 90, 180);
+    write(svalue);
     speed = new_speed;
     do_update = true;
   }
@@ -153,6 +156,7 @@ void callback(char *topic_str, byte *payload, unsigned int length) {
   }
 }
 
+
 void reconnect() {
   // Loop until we're reconnected
   while (!client.connected()) {
@@ -169,6 +173,18 @@ void reconnect() {
 
       String cmnd_topic = String("cmnd/") + dname + "/#";
       client.subscribe(cmnd_topic.c_str());
+
+      DateTime.begin(/* timeout param */);
+      if (!DateTime.isTimeValid()) {
+        Serial.println("Failed to get time from server.");
+      } else {
+        Serial.printf("Date Now is %s\n", DateTime.toISOString().c_str());
+        Serial.printf("Timestamp is %s\n", DateTime.formatUTC(DateFormatter::ISO8601).c_str());
+          time_t t = time(NULL);
+  Serial.printf("OS local:     %s", asctime(localtime(&t)));
+  Serial.printf("OS UTC:       %s", asctime(gmtime(&t)));
+      }
+ 
     } else {
       Serial.print("failed, rc=");
       Serial.print(client.state());
@@ -185,6 +201,7 @@ struct DRow {
   float last_temp;
   float diff;
   unsigned long last_temp_send_time;
+  time_t receive_time_t;
 public:
   DRow() : changed(false), temp(0.0), last_temp(NANTEMP), diff(0.0) {}
 };
@@ -195,6 +212,8 @@ void setup() {
   Serial.begin(115200);
   Serial.println("Start");
 
+  DateTime.setTimeZone("AEST-10AEDT,M10.1.0,M4.1.0/3");
+  tzset();
   tft.init();
   tft.fontHeight(4);
   tft.setRotation(1);
@@ -220,8 +239,10 @@ void setup() {
   tft.loadFont(AA_FONT_LARGE); // Must load the font first
   tft.fillScreen(TFT_BLACK);
 
-  wifiManager.autoConnect("portal");
-
+  auto res = wifiManager.autoConnect("portal");
+  if (!res) {
+    Serial.printf("Failed to connect");
+  }
   client.setServer(mqtt_server, 1883);
   client.setCallback(callback);
 
@@ -256,7 +277,7 @@ void setup() {
   }
 }
 
-const int period = 2000;
+const int period = 1000;
 unsigned long last_loop_time;
 const int forced_send_period = 30000;
 
@@ -272,7 +293,7 @@ void loop() {
     sensors.requestTemperatures();
     for (int snum = 0; snum < device_count; snum++) {
       float temp = sensors.getTempCByIndex(snum);
-
+      // Serial.printf("temp %f %d\n", temp, snum);
       if (temp != DEVICE_DISCONNECTED_C) {
         float diff = drows[snum]->last_temp != NANTEMP
                          ? temp - drows[snum]->last_temp
@@ -282,6 +303,7 @@ void loop() {
           drows[snum]->changed = true;
           drows[snum]->temp = temp;
           drows[snum]->diff = diff;
+          drows[snum]->receive_time_t = DateTime.now();
           changes = true;
         }
       } else {
@@ -298,6 +320,8 @@ void loop() {
         tft.drawString(buff, 3, 35 * snum, 0);
         // Serial.printf("%s\n", buff);
       }
+
+      tft.drawString(DateTime.format(DateFormatter::TIME_ONLY), 3, 70, 0);
     }
     if (client.connected()) {
       for (int snum = 0; snum < device_count; snum++) {
@@ -312,7 +336,7 @@ void loop() {
           doc["sensor"] = snum;
           doc["temp"] = drows[snum]->temp;
           doc["diff"] = drows[snum]->diff;
-
+          doc["timestamp"] = drows[snum]->receive_time_t;
           if (forced) {
             doc["forced"] = true;
           }
@@ -323,9 +347,6 @@ void loop() {
           last_temp_send_time = now;
         }
       }
-      for (int servo = 0; servo < num_servos; servo++) {
-        servos[servo]->do_update_if_needed(servo);
-      }
     }
     for (int snum = 0; snum < device_count; snum++) {
       if (drows[snum]->temp != NANTEMP)
@@ -333,5 +354,10 @@ void loop() {
       drows[snum]->changed = false;
     }
   }
+
+  for (int servo = 0; servo < num_servos; servo++) {
+    servos[servo]->do_update_if_needed(servo);
+  }
+
   client.loop();
 }
