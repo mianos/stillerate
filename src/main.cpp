@@ -15,6 +15,7 @@
 #include <StringSplitter.h>
 #include <WiFiManager.h>
 #include <PID_v1.h>
+#include <PID_AutoTune_v0.h>
 
 const char *dname = "stillerator";
 
@@ -60,6 +61,7 @@ double Input, Output;
 //Specify the links and initial tuning parameters
 double Kp=2, Ki=5, Kd=1;
 PID myPID(&Input, &Output, &Setpoint, Kp, Ki, Kd, P_ON_M, REVERSE);
+bool pid_loop_on = false;
 
 const char *mqtt_server = "mqtt2.mianos.com";
 const char* ntpServer = "ntp.mianos.com";
@@ -141,6 +143,7 @@ void callback(char *topic_str, byte *payload, unsigned int length) {
       //Serial.printf("payload '%s'\n", output.c_str());
     }
     auto dest = splitter.getItemAtIndex(2);
+    Serial.printf("dest '%s'\n", dest.c_str());
     if (dest == "pump") {
       if (!jpl.containsKey("number")) {
         Serial.printf("Does not contain a pump number");
@@ -162,12 +165,18 @@ void callback(char *topic_str, byte *payload, unsigned int length) {
       }
       servos[number]->set(speed);
     } else if (dest == "pid") {
-      Serial.printf("Pid control is %c\n", payload[0]);
-    } else if (dest == "setpoint") {
-      String output;
-      serializeJson(jpl, output);
-      Serial.printf("setpoint %s\n", output.c_str());
-      Setpoint = (double)jpl["setpoint"];
+      if (jpl.containsKey("setpoint")) {
+        Serial.printf("setpoint %s\n", jpl["setpoint"]);
+        Setpoint = (double)jpl["setpoint"];
+      }
+      if (jpl.containsKey("autotune")) {
+        bool autotune = jpl["autotune"];
+        Serial.printf("autotune, state %s\n", autotune ? "on" : "off");
+      }
+      if (jpl.containsKey("run")) {
+        Serial.printf("pid control state %s\n", jpl["run"]  ? "on" : "off");
+        pid_loop_on = jpl["run"];
+      }
     } 
   }
 }
@@ -194,6 +203,7 @@ void reconnect() {
       // Once connected, publish an announcement...
       StaticJsonDocument<200> doc;
       doc["setpoint"] = Setpoint;
+      doc["run"] = pid_loop_on;
       doc["time"] = DateTime.toISOString();
       String status_topic = "tele/" + String(dname) + "/init";
       String output;
@@ -340,12 +350,23 @@ void loop() {
         // Serial.printf("%s\n", buff);
       }
       tft.drawString(DateTime.format(DateFormatter::TIME_ONLY), 3, 70, 0);
-      for (int snum = 0; snum < device_count; snum++) {
-        if (drows[snum]->changed) {
-          if (snum == 0) { // sensor 0 under pid control, should be adjustable via config  
-            Input = drows[snum]->temp;
-            myPID.Compute();
-            Serial.printf("In %f Computed %f\n", Input, Output);
+      if (pid_loop_on) {
+        for (int snum = 0; snum < device_count; snum++) {
+          if (drows[snum]->changed) {
+            if (snum == 0) { // sensor 0 under pid control, should be adjustable via config  
+              Input = drows[snum]->temp;
+              myPID.Compute();
+              StaticJsonDocument<200> doc;
+              doc["number"] = 0;
+              doc["input"] = Input;
+              doc["output"] = Output;
+              doc["timestamp"] =  DateTime.now();
+              String output;
+              serializeJson(doc, output);
+
+              String tele_topic = String("tele/") + dname + "/pid";
+              client.publish(tele_topic.c_str(), output.c_str());
+            }
           }
         }
       }
