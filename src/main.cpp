@@ -54,11 +54,12 @@ const long NANTEMP = -100.0;
 
 // PID vars
 //Define Variables we'll be connecting to
-double Setpoint, Input, Output;
+double Setpoint = 30.0;
+double Input, Output;
 
 //Specify the links and initial tuning parameters
 double Kp=2, Ki=5, Kd=1;
-PID myPID(&Input, &Output, &Setpoint, Kp, Ki, Kd, P_ON_M, DIRECT);
+PID myPID(&Input, &Output, &Setpoint, Kp, Ki, Kd, P_ON_M, REVERSE);
 
 const char *mqtt_server = "mqtt2.mianos.com";
 const char* ntpServer = "ntp.mianos.com";
@@ -181,10 +182,6 @@ void reconnect() {
     clientId += String(random(0xffff), HEX);
     // Attempt to connect
     if (client.connect(clientId.c_str())) {
-      Serial.println("connected");
-      // Once connected, publish an announcement...
-      String status_topic = String(dname) + "/status";
-      client.publish(status_topic.c_str(), "starting");
 
       String cmnd_topic = String("cmnd/") + dname + "/#";
       client.subscribe(cmnd_topic.c_str());
@@ -192,10 +189,16 @@ void reconnect() {
       DateTime.begin(/* timeout param */);
       if (!DateTime.isTimeValid()) {
         Serial.println("Failed to get time from server.");
-      } else {
-        Serial.printf("Date Now is %s\n", DateTime.toISOString().c_str());
-        Serial.printf("Timestamp is %s\n", DateTime.formatUTC(DateFormatter::ISO8601).c_str());
-      }
+      } 
+      Serial.println("connected");
+      // Once connected, publish an announcement...
+      StaticJsonDocument<200> doc;
+      doc["setpoint"] = Setpoint;
+      doc["time"] = DateTime.toISOString();
+      String status_topic = "tele/" + String(dname) + "/init";
+      String output;
+      serializeJson(doc, output);
+      client.publish(status_topic.c_str(), output.c_str());
  
     } else {
       Serial.print("failed, rc=");
@@ -289,6 +292,7 @@ void setup() {
   }
   //turn the PID on
  
+  myPID.SetOutputLimits(0,100);
   myPID.SetMode(AUTOMATIC);
 }
 
