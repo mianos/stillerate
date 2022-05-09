@@ -70,7 +70,6 @@ float Kp=2, Ki=5, Kd=1;
 
 QuickPID myPID(&Input, &Output, &Setpoint);
 
-bool pid_loop_on = false;
 bool autotune_on = false;
 
 const char *mqtt_server = "mqtt2.mianos.com";
@@ -80,7 +79,7 @@ WiFiManager wifiManager;
 PubSubClient client(espClient);
 
 class CServo : private Servo {
-  int speed;
+  int speed; 
   bool do_update;
 public:
   CServo(int pin) : speed(0), do_update(true) {
@@ -95,11 +94,16 @@ public:
     attach(pin, 1000, 2000); //
     write(speed);
   }
-  void set(int new_speed) {
-    auto svalue = map(new_speed, 0, 100, 90, 180);
-    write(svalue);
-    speed = new_speed;
-    do_update = true;
+
+  bool set(int new_speed) {
+    if (new_speed != speed) {
+      write(map(new_speed, 0, 100, 90, 180));
+      speed = new_speed;
+      do_update = true;
+      return true;
+    } else {
+      return false;
+    }
   }
 
   void do_update_if_needed(int snum) {
@@ -185,7 +189,7 @@ void callback(char *topic_str, byte *payload, unsigned int length) {
       }
       if (jpl.containsKey("run")) {
         Serial.printf("pid control state %s\n", jpl["run"]  ? "on" : "off");
-        pid_loop_on = jpl["run"];
+        myPID.SetMode(jpl["run"] ? myPID.Control::automatic : myPID.Control::manual);
       }
     } 
   }
@@ -214,7 +218,7 @@ void reconnect() {
       StaticJsonDocument<200> doc;
       doc["setpoint"] = Setpoint;
       doc["autotune"] = autotune_on;
-      doc["run"] = pid_loop_on;
+      doc["run"] = myPID.GetMode() ? true : false;
       doc["time"] = DateTime.toISOString();
       String status_topic = "tele/" + String(dname) + "/init";
       String output;
@@ -365,24 +369,6 @@ void loop() {
         // Serial.printf("%s\n", buff);
       }
       tft.drawString(DateTime.format(DateFormatter::TIME_ONLY), 3, 70, 0);
-      if (pid_loop_on) {
-        for (int snum = 0; snum < device_count; snum++) {
-          if (snum == 0) { // sensor 0 under pid control, should be adjustable via config  
-            Input = drows[snum]->temp;
-            myPID.Compute();
-            StaticJsonDocument<200> doc;
-            doc["number"] = 0;
-            doc["input"] = Input;
-            doc["output"] = Output;
-            doc["timestamp"] =  DateTime.now();
-            String output;
-            serializeJson(doc, output);
-
-            String tele_topic = String("tele/") + dname + "/pid";
-            client.publish(tele_topic.c_str(), output.c_str());
-          }
-        }
-      }
     }
     if (client.connected()) {
       for (int snum = 0; snum < device_count; snum++) {
@@ -414,6 +400,26 @@ void loop() {
         drows[snum]->last_temp = drows[snum]->temp;
       }
       drows[snum]->changed = false;
+    }
+  }
+  for (int snum = 0; snum < device_count; snum++) {
+    if (snum == 0) { // sensor 0 under pid control, should be adjustable via config  
+      Input = drows[snum]->temp;
+      if (!myPID.Compute()) {
+        break;
+      }
+      if (servos[snum]->set(Output)) {
+        StaticJsonDocument<200> doc;
+        doc["number"] = 0;
+        doc["input"] = Input;
+        doc["output"] = Output;
+        doc["timestamp"] =  DateTime.now();
+        String output;
+        serializeJson(doc, output);
+
+        String tele_topic = String("tele/") + dname + "/pid";
+        client.publish(tele_topic.c_str(), output.c_str());
+      }
     }
   }
   for (int servo = 0; servo < num_servos; servo++) {
