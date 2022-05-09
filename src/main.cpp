@@ -54,20 +54,23 @@ const long NANTEMP = -100.0;
 
 // PID vars
 //Define Variables we'll be connecting to
-float Setpoint = 30.0;
+float Setpoint = 25.0;
 float Input, Output;
+
+const float outputSpan = 100;
 
 //Specify the links and initial tuning parameters
 float Kp=2, Ki=5, Kd=1;
 
-QuickPID myPID(&Input, &Output, &Setpoint, Kp, Ki, Kd, 
-    myPID.pMode::pOnError,
-    myPID.dMode::dOnMeas,
-    myPID.iAwMode::iAwCondition,             /* iAwCondition, iAwClamp, iAwOff */
-    myPID.Action::reverse);                   /* direct, reverse */
+//QuickPID myPID(&Input, &Output, &Setpoint, Kp, Ki, Kd, 
+//    myPID.pMode::pOnError,
+//    myPID.dMode::dOnMeas,
+//    myPID.iAwMode::iAwCondition,             /* iAwCondition, iAwClamp, iAwOff */
+//    myPID.Action::reverse);                   /* direct, reverse */
+
+QuickPID myPID(&Input, &Output, &Setpoint);
 
 bool pid_loop_on = false;
-
 bool autotune_on = false;
 
 const char *mqtt_server = "mqtt2.mianos.com";
@@ -310,9 +313,12 @@ void setup() {
   }
   //turn the PID on
  
-  myPID.SetTunings(Kp, Ki, Kd);
-  myPID.SetOutputLimits(0, 100);
-  myPID.SetMode(myPID.Control::automatic);
+  myPID.SetOutputLimits(0, outputSpan);
+  myPID.SetMode(myPID.Control::automatic); // the PID is turned on
+  myPID.SetProportionalMode(myPID.pMode::pOnMeas);
+  myPID.SetAntiWindupMode(myPID.iAwMode::iAwClamp);
+  myPID.SetTunings(Kp, Ki, Kd); // set PID gains
+  myPID.SetControllerDirection(myPID.Action::reverse);
 }
 
 const int period = 1000;
