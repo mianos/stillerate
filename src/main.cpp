@@ -15,6 +15,7 @@
 #include <StringSplitter.h>
 #include <WiFiManager.h>
 #include <QuickPID.h>
+#include <sTune.h>
 
 const char *dname = "stillerator";
 
@@ -62,21 +63,36 @@ const float outputSpan = 100;
 //Specify the links and initial tuning parameters
 float Kp=2, Ki=5, Kd=1;
 
-//QuickPID myPID(&Input, &Output, &Setpoint, Kp, Ki, Kd, 
-//    myPID.pMode::pOnError,
-//    myPID.dMode::dOnMeas,
-//    myPID.iAwMode::iAwCondition,             /* iAwCondition, iAwClamp, iAwOff */
-//    myPID.Action::reverse);                   /* direct, reverse */
 
+sTune tuner = sTune(&Input, &Output, tuner.ZN_PID, tuner.directIP, tuner.printOFF);
 QuickPID myPID(&Input, &Output, &Setpoint);
 
 bool autotune_on = false;
+
 
 const char *mqtt_server = "mqtt2.mianos.com";
 const char* ntpServer = "ntp.mianos.com";
 WiFiClient espClient;
 WiFiManager wifiManager;
 PubSubClient client(espClient);
+
+void update_mqtt_pid_output(String reason) {
+		StaticJsonDocument<200> doc;
+		doc["number"] = 0;
+		doc["input"] = Input;
+		doc["output"] = Output;
+		doc["kp"] = Kp;
+		doc["ki"] = Ki;
+		doc["kd"] = Kd;
+		doc["setpoint"] = Setpoint;
+		doc["reason"] = reason;
+		doc["timestamp"] =  DateTime.now();
+		String output;
+		serializeJson(doc, output);
+
+		String tele_topic = String("tele/") + dname + "/pid";
+		client.publish(tele_topic.c_str(), output.c_str());
+}
 
 class CServo : private Servo {
   int speed; 
@@ -95,7 +111,7 @@ public:
     write(speed);
   }
 
-  bool set(int new_speed) {
+  bool set(int new_speed, int snum) {
     if (new_speed != speed) {
       write(map(new_speed, 0, 100, 90, 180));
       speed = new_speed;
@@ -177,7 +193,7 @@ void callback(char *topic_str, byte *payload, unsigned int length) {
         Serial.printf("Invalid speed number %ld", speed);
         return;
       }
-      servos[number]->set(speed);
+      servos[number]->set(speed, number);
     } else if (dest == "pid") {
       if (jpl.containsKey("setpoint")) {
         Serial.printf("setpoint %s\n", jpl["setpoint"]);
@@ -190,6 +206,21 @@ void callback(char *topic_str, byte *payload, unsigned int length) {
       if (jpl.containsKey("run")) {
         Serial.printf("pid control state %s\n", jpl["run"]  ? "on" : "off");
         myPID.SetMode(jpl["run"] ? myPID.Control::automatic : myPID.Control::manual);
+      }
+      if (jpl.containsKey("kp")) {
+        auto xx = jpl["kp"].as<float>();
+        Serial.printf("setting Kp %f\n", xx);
+        Kp = xx;
+      }
+      if (jpl.containsKey("ki")) {
+        auto xx = jpl["ki"].as<float>();
+        Serial.printf("setting Ki %f\n", xx);
+        Ki = xx;
+      }
+      if (jpl.containsKey("kd")) {
+        auto xx = jpl["kd"].as<float>();
+        Serial.printf("setting Kd %f\n", xx);
+        Kd = xx;
       }
     } 
   }
@@ -217,13 +248,14 @@ void reconnect() {
       // Once connected, publish an announcement...
       StaticJsonDocument<200> doc;
       doc["setpoint"] = Setpoint;
-      doc["autotune"] = autotune_on;
       doc["run"] = myPID.GetMode() ? true : false;
+      doc["autotune"] = autotune_on;
       doc["time"] = DateTime.toISOString();
       String status_topic = "tele/" + String(dname) + "/init";
       String output;
       serializeJson(doc, output);
       client.publish(status_topic.c_str(), output.c_str());
+			update_mqtt_pid_output("Reconnect");
  
     } else {
       Serial.print("failed, rc=");
@@ -318,16 +350,30 @@ void setup() {
   //turn the PID on
  
   myPID.SetOutputLimits(0, outputSpan);
-  myPID.SetMode(myPID.Control::automatic); // the PID is turned on
+  // myPID.SetMode(myPID.Control::automatic); // the PID is turned on
+  myPID.SetMode(myPID.Control::manual); // the PID is turned on
   myPID.SetProportionalMode(myPID.pMode::pOnMeas);
   myPID.SetAntiWindupMode(myPID.iAwMode::iAwClamp);
+  myPID.SetSampleTimeUs(2000000);
   myPID.SetTunings(Kp, Ki, Kd); // set PID gains
   myPID.SetControllerDirection(myPID.Action::reverse);
+
+
+	uint32_t settleTimeSec = 10;
+	uint32_t testTimeSec = 100;
+	const uint16_t samples = 500;
+	const float inputSpan = 110;
+	float outputStart = 25;
+	float outputStep = 20;
+  tuner.Configure(inputSpan, outputSpan, outputStart, outputStep, testTimeSec, settleTimeSec, samples);
+	tuner.SetControllerAction(tuner.Action::reverseIP);
+	tuner.SetSerialMode(tuner.SerialMode::printDEBUG);
 }
 
 const int period = 1000;
 unsigned long last_loop_time;
 const int forced_send_period = 30000;
+
 
 void loop() {
   unsigned long now = millis();
@@ -404,21 +450,36 @@ void loop() {
   }
   for (int snum = 0; snum < device_count; snum++) {
     if (snum == 0) { // sensor 0 under pid control, should be adjustable via config  
-      Input = drows[snum]->temp;
-      if (!myPID.Compute()) {
-        break;
-      }
-      if (servos[snum]->set(Output)) {
-        StaticJsonDocument<200> doc;
-        doc["number"] = 0;
-        doc["input"] = Input;
-        doc["output"] = Output;
-        doc["timestamp"] =  DateTime.now();
-        String output;
-        serializeJson(doc, output);
+			Input = drows[snum]->temp;
+			uint8_t tmode;
 
-        String tele_topic = String("tele/") + dname + "/pid";
-        client.publish(tele_topic.c_str(), output.c_str());
+			if (autotune_on) {
+				tmode = tuner.Run();
+			} else {
+				tmode = tuner.runPid;
+			}
+			switch (tmode) {
+			case tuner.tunings: 
+				if (isinf(tuner.GetKp())) {
+					Serial.printf("Auto tune failed");
+					update_mqtt_pid_output("Auto tune failed");
+				} else {
+					tuner.GetAutoTunings(&Kp, &Ki, &Kd); // sketch variables updated by sTune
+					myPID.SetTunings(Kp, Ki, Kd); // update PID with the new tunings
+					update_mqtt_pid_output("OK tune");
+				}
+				myPID.SetMode(myPID.Control::automatic); // the PID is turned on
+				break;
+			case tuner.runPid:
+				myPID.Compute();
+				break;
+			}
+
+      // if automatic pid or tuning set the output
+      if (myPID.GetMode() || autotune_on) {
+        if (servos[snum]->set(Output, snum)) {
+          update_mqtt_pid_output("Speed change");
+        }
       }
     }
   }
