@@ -5,6 +5,10 @@
 #include <ESP32Servo.h>
 #include <OneWire.h>
 #include <SPI.h>
+
+//#include "display.h"
+//#define USER_SETUP_LOADED
+
 #include <TFT_eSPI.h>
 #include <WiFi.h>
 #include <Wire.h>
@@ -15,7 +19,6 @@
 #include <StringSplitter.h>
 #include <WiFiManager.h>
 #include <QuickPID.h>
-#include <sTune.h>
 
 const char *dname = "stillerator";
 
@@ -55,19 +58,15 @@ const long NANTEMP = -100.0;
 
 // PID vars
 //Define Variables we'll be connecting to
-float Setpoint = 25.0;
+float Setpoint = 78.4;
 float Input, Output;
 
 const float outputSpan = 100;
 
 //Specify the links and initial tuning parameters
-float Kp=2, Ki=5, Kd=1;
+float Kp=2, Ki=5, Kd=0;
 
-
-sTune tuner = sTune(&Input, &Output, tuner.ZN_PID, tuner.directIP, tuner.printOFF);
 QuickPID myPID(&Input, &Output, &Setpoint);
-
-bool autotune_on = false;
 
 
 const char *mqtt_server = "mqtt2.mianos.com";
@@ -196,12 +195,8 @@ void callback(char *topic_str, byte *payload, unsigned int length) {
       servos[number]->set(speed, number);
     } else if (dest == "pid") {
       if (jpl.containsKey("setpoint")) {
-        Serial.printf("setpoint %s\n", jpl["setpoint"]);
+        Serial.printf("setpoint %f\n", jpl["setpoint"].as<float>());
         Setpoint = (double)jpl["setpoint"];
-      }
-      if (jpl.containsKey("autotune")) {
-        Serial.printf("autotune, state %s\n", jpl["autotune"] ? "on" : "off");
-        autotune_on = jpl["autotune"];
       }
       if (jpl.containsKey("run")) {
         Serial.printf("pid control state %s\n", jpl["run"]  ? "on" : "off");
@@ -222,6 +217,7 @@ void callback(char *topic_str, byte *payload, unsigned int length) {
         Serial.printf("setting Kd %f\n", xx);
         Kd = xx;
       }
+       myPID.SetTunings(Kp, Ki, Kd);
     } 
   }
 }
@@ -249,7 +245,6 @@ void reconnect() {
       StaticJsonDocument<200> doc;
       doc["setpoint"] = Setpoint;
       doc["run"] = myPID.GetMode() ? true : false;
-      doc["autotune"] = autotune_on;
       doc["time"] = DateTime.toISOString();
       String status_topic = "tele/" + String(dname) + "/init";
       String output;
@@ -351,23 +346,13 @@ void setup() {
  
   myPID.SetOutputLimits(0, outputSpan);
   // myPID.SetMode(myPID.Control::automatic); // the PID is turned on
-  myPID.SetMode(myPID.Control::manual); // the PID is turned on
-  myPID.SetProportionalMode(myPID.pMode::pOnMeas);
+  myPID.SetMode(myPID.Control::manual); // the PID is turned off
+  myPID.SetProportionalMode(myPID.pMode::pOnError);
+  myPID.SetDerivativeMode(myPID.dMode::dOnMeas);
   myPID.SetAntiWindupMode(myPID.iAwMode::iAwClamp);
-  myPID.SetSampleTimeUs(2000000);
   myPID.SetTunings(Kp, Ki, Kd); // set PID gains
   myPID.SetControllerDirection(myPID.Action::reverse);
 
-
-	uint32_t settleTimeSec = 10;
-	uint32_t testTimeSec = 100;
-	const uint16_t samples = 500;
-	const float inputSpan = 110;
-	float outputStart = 25;
-	float outputStep = 20;
-  tuner.Configure(inputSpan, outputSpan, outputStart, outputStep, testTimeSec, settleTimeSec, samples);
-	tuner.SetControllerAction(tuner.Action::reverseIP);
-	tuner.SetSerialMode(tuner.SerialMode::printDEBUG);
 }
 
 const int period = 1000;
@@ -451,32 +436,11 @@ void loop() {
   for (int snum = 0; snum < device_count; snum++) {
     if (snum == 0) { // sensor 0 under pid control, should be adjustable via config  
 			Input = drows[snum]->temp;
-			uint8_t tmode;
 
-			if (autotune_on) {
-				tmode = tuner.Run();
-			} else {
-				tmode = tuner.runPid;
-			}
-			switch (tmode) {
-			case tuner.tunings: 
-				if (isinf(tuner.GetKp())) {
-					Serial.printf("Auto tune failed");
-					update_mqtt_pid_output("Auto tune failed");
-				} else {
-					tuner.GetAutoTunings(&Kp, &Ki, &Kd); // sketch variables updated by sTune
-					myPID.SetTunings(Kp, Ki, Kd); // update PID with the new tunings
-					update_mqtt_pid_output("OK tune");
-				}
-				myPID.SetMode(myPID.Control::automatic); // the PID is turned on
-				break;
-			case tuner.runPid:
-				myPID.Compute();
-				break;
-			}
+      myPID.Compute();
 
       // if automatic pid or tuning set the output
-      if (myPID.GetMode() || autotune_on) {
+      if (myPID.GetMode()) {
         if (servos[snum]->set(Output, snum)) {
           update_mqtt_pid_output("Speed change");
         }
