@@ -18,7 +18,10 @@
 #include <PubSubClient.h>
 #include <StringSplitter.h>
 #include <WiFiManager.h>
+#include <ArduinoOTA.h>
 #include <QuickPID.h>
+
+#include "MAX31865.h"
 
 const char *dname = "stillerator";
 
@@ -31,6 +34,7 @@ const char *dname = "stillerator";
 #ifndef TFT_DISPOFF
 #define TFT_DISPOFF 0x28
 #endif
+
 
 #ifndef TFT_SLPIN
 #define TFT_SLPIN 0x10
@@ -67,6 +71,16 @@ const float outputSpan = 100;
 float Kp=2, Ki=5, Kd=0;
 
 QuickPID myPID(&Input, &Output, &Setpoint);
+
+MAX31865_RTD *rtd;
+
+#define HSPI_MISO   26
+#define HSPI_MOSI   27
+#define HSPI_SCLK   25
+#define HSPI_SS     33
+
+static const int spiClk = 1000000; // 10khz // 1 MHz
+SPIClass * hspi = NULL;
 
 
 const char *mqtt_server = "mqtt2.mianos.com";
@@ -281,6 +295,35 @@ void setup() {
 
   DateTime.setTimeZone("AEST-10AEDT,M10.1.0,M4.1.0/3");
   tzset();
+
+	ArduinoOTA
+	.onStart([]() {
+      String type;
+      if (ArduinoOTA.getCommand() == U_FLASH)
+        type = "sketch";
+      else // U_SPIFFS
+        type = "filesystem";
+
+      // NOTE: if updating SPIFFS this would be the place to unmount SPIFFS using SPIFFS.end()
+      Serial.println("Start updating " + type);
+    })
+    .onEnd([]() {
+      Serial.println("\nEnd");
+    })
+    .onProgress([](unsigned int progress, unsigned int total) {
+      Serial.printf("Progress: %u%%\r", (progress / (total / 100)));
+    })
+    .onError([](ota_error_t error) {
+      Serial.printf("Error[%u]: ", error);
+      if (error == OTA_AUTH_ERROR) Serial.println("Auth Failed");
+      else if (error == OTA_BEGIN_ERROR) Serial.println("Begin Failed");
+      else if (error == OTA_CONNECT_ERROR) Serial.println("Connect Failed");
+      else if (error == OTA_RECEIVE_ERROR) Serial.println("Receive Failed");
+      else if (error == OTA_END_ERROR) Serial.println("End Failed");
+    });
+
+  ArduinoOTA.begin();
+
   tft.init();
   tft.fontHeight(4);
   tft.setRotation(1);
@@ -342,8 +385,15 @@ void setup() {
   for (auto ii = 0; ii < num_servos; ii++) {
     servos[ii] = new CServo(servo_pins[ii]);
   }
+
+  hspi = new SPIClass(VSPI);
+
+  hspi->begin(HSPI_SCLK, HSPI_MISO, HSPI_MOSI, HSPI_SS); //SCLK, MISO, MOSI, SS
+  auto *spis = new SPISettings(spiClk, MSBFIRST, SPI_MODE3);
+  rtd = new MAX31865_RTD(MAX31865_RTD::RTD_PT100, HSPI_SS, hspi, spis);
+
+  rtd->configure(true, true, false, true, MAX31865_FAULT_DETECTION_NONE, true, true, 0x0000, 0x7fff);
   //turn the PID on
- 
   myPID.SetOutputLimits(0, outputSpan);
   // myPID.SetMode(myPID.Control::automatic); // the PID is turned on
   myPID.SetMode(myPID.Control::manual); // the PID is turned off
@@ -369,6 +419,10 @@ void loop() {
       reconnect();
     }
     bool changes = false;
+
+    rtd->read_all();
+    Serial.printf("%s, %g\n", DateTime.toISOString().c_str(), rtd->temperature());
+
     sensors.requestTemperatures();
     for (int snum = 0; snum < device_count; snum++) {
       float temp = sensors.getTempCByIndex(snum);
@@ -451,4 +505,5 @@ void loop() {
     servos[servo]->do_update_if_needed(servo);
   }
   client.loop();
+  ArduinoOTA.handle();
 }
