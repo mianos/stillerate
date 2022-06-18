@@ -57,7 +57,8 @@ int device_count = 0;
 
 class TenpSensor {
 public:
-   virtual float temp() = 0;
+  virtual float temp() = 0;
+  virtual bool requestTemp() = 0;
 };
 
 class DallasTemp :  TenpSensor {
@@ -84,6 +85,39 @@ public:
 
 DallasTemp **dallas_devices;
 
+#define HSPI_MISO   26
+#define HSPI_MOSI   27
+#define HSPI_SCLK   25
+#define HSPI_SS     33
+
+
+class PT100Temp : TenpSensor {
+  SPIClass *hspi;
+  int ss;
+  SPISettings *spis;
+  MAX31865_RTD *rtd;
+public:
+  PT100Temp(int ss_a=HSPI_SS, int spi_clock=1000000) : ss(ss_a) {
+    hspi = new SPIClass(VSPI);
+    hspi->begin(HSPI_SCLK, HSPI_MISO, HSPI_MOSI, ss); //SCLK, MISO, MOSI, SS
+    spis = new SPISettings(spi_clock, MSBFIRST, SPI_MODE3);
+    rtd = new MAX31865_RTD(MAX31865_RTD::RTD_PT100, ss, hspi, spis);
+    rtd->configure(true, true, false, true, MAX31865_FAULT_DETECTION_NONE, true, true, 0x0000, 0x7fff);
+  }
+
+  bool requestTemp() {
+    return rtd->read_all();
+  }
+
+  float temp() {
+    return rtd->temperature();
+  }
+};
+
+
+PT100Temp *pt100_device;
+
+
 float *last_values;
 const long NANTEMP = -100.0;
 
@@ -99,11 +133,7 @@ float Kp=2, Ki=5, Kd=0;
 
 QuickPID myPID(&Input, &Output, &Setpoint);
 
-MAX31865_RTD *rtd;
 
-
-static const int spiClk = 1000000; // 10khz // 1 MHz
-SPIClass * hspi = NULL;
 
 
 const char *mqtt_server = "mqtt2.mianos.com";
@@ -348,24 +378,13 @@ void setup() {
     drows[ii] = new DRow();
   }
 
+  pt100_device = new PT100Temp();
 
   servos = new CServo *[num_servos];
   for (auto ii = 0; ii < num_servos; ii++) {
     servos[ii] = new CServo(servo_pins[ii], dname, client);
   }
 
-  hspi = new SPIClass(VSPI);
-
-#define HSPI_MISO   26
-#define HSPI_MOSI   27
-#define HSPI_SCLK   25
-#define HSPI_SS     33
-
-  hspi->begin(HSPI_SCLK, HSPI_MISO, HSPI_MOSI, HSPI_SS); //SCLK, MISO, MOSI, SS
-  auto *spis = new SPISettings(spiClk, MSBFIRST, SPI_MODE3);
-  rtd = new MAX31865_RTD(MAX31865_RTD::RTD_PT100, HSPI_SS, hspi, spis);
-
-  rtd->configure(true, true, false, true, MAX31865_FAULT_DETECTION_NONE, true, true, 0x0000, 0x7fff);
   //turn the PID on
   myPID.SetOutputLimits(0, outputSpan);
   // myPID.SetMode(myPID.Control::automatic); // the PID is turned on
@@ -393,13 +412,12 @@ void loop() {
     }
     bool changes = false;
 
-    rtd->read_all();
-    Serial.printf("%s, %g\n", DateTime.toISOString().c_str(), rtd->temperature());
+    pt100_device->requestTemp();
+    Serial.printf("%s, %g\n", DateTime.toISOString().c_str(), pt100_device->temp());
 
     for (int snum = 0; snum < device_count; snum++) {
         dallas_devices[snum]->requestTemp();
     }
-    Serial.printf("getting temp\n");
     for (int snum = 0; snum < device_count; snum++) {
       float temp = dallas_devices[snum]->temp();
       // Serial.printf("temp %f %d\n", temp, snum);
