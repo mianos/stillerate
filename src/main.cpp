@@ -2,7 +2,6 @@
 
 #include <Button2.h>
 #include <DallasTemperature.h>
-#include <ESP32Servo.h>
 #include <OneWire.h>
 #include <SPI.h>
 
@@ -21,6 +20,7 @@
 #include <ArduinoOTA.h>
 #include <QuickPID.h>
 
+#include "cservo.h"
 #include "MAX31865.h"
 
 const char *dname = "stillerator";
@@ -103,52 +103,7 @@ void update_mqtt_pid_output(String reason) {
 		client.publish(tele_topic.c_str(), output.c_str());
 }
 
-class CServo : private Servo {
-  int speed; 
-  bool do_update;
-public:
-  CServo(int pin) : speed(0), do_update(true) {
-    static bool timers_allocated = false;
-    if (!timers_allocated) {
-      for (auto ii = 0; ii < 4; ii++) {
-        ESP32PWM::allocateTimer(ii);
-      }
-      timers_allocated = true;
-    }
-    setPeriodHertz(50);      // standard 50 hz servo
-    attach(pin, 1000, 2000); //
-    write(speed);
-  }
-
-  bool set(int new_speed, int snum) {
-    if (new_speed != speed) {
-      write(map(new_speed, 0, 100, 90, 180));
-      speed = new_speed;
-      do_update = true;
-      return true;
-    } else {
-      return false;
-    }
-  }
-
-  void do_update_if_needed(int snum) {
-    if (do_update == false) {
-      return;
-    }
-    StaticJsonDocument<200> doc;
-
-    doc["number"] = snum;
-    doc["speed"] = speed;
-
-    String output;
-    serializeJson(doc, output);
-    String status_topic = "tele/" + String(dname) + "/pump";
-    client.publish(status_topic.c_str(), output.c_str());
-    do_update = false;
-  }
-};
-
-int servo_pins[] = {21, 22};
+int servo_pins[] = {22, 21};
 CServo **servos;
 const int num_servos = sizeof(servo_pins) / sizeof(int);
 
@@ -380,7 +335,7 @@ void setup() {
 
   servos = new CServo *[num_servos];
   for (auto ii = 0; ii < num_servos; ii++) {
-    servos[ii] = new CServo(servo_pins[ii]);
+    servos[ii] = new CServo(servo_pins[ii], dname, client);
   }
 
   hspi = new SPIClass(VSPI);
