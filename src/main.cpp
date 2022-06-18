@@ -47,16 +47,43 @@ TFT_eSPI tft = TFT_eSPI(135, 240); // Invoke custom library
 #define BUTTON_1 35
 #define BUTTON_2 0
 
-// Data wire is plugged into port 2 on the Arduino
-//#define ONE_WIRE_BUS GPIO_NUM_33
 #define ONE_WIRE_BUS GPIO_NUM_13
+OneWire oneWire_g(ONE_WIRE_BUS);
+DallasTemperature sensors(&oneWire_g);
 
-// Setup a oneWire instance to communicate with any OneWire devices (not just
-// Maxim/Dallas temperature ICs)
-OneWire oneWire(ONE_WIRE_BUS);
-DallasTemperature sensors(&oneWire);
+
+
 int device_count = 0;
-DeviceAddress *sensor_addresses;
+
+class TenpSensor {
+public:
+   virtual float temp() = 0;
+};
+
+class DallasTemp :  TenpSensor {
+  int index;
+  DallasTemperature &sensors_m;
+  uint8_t deviceAddress;
+public:
+  DallasTemp(DallasTemperature& sensors_a, int index_a) : sensors_m(sensors_a), index(index_a) {
+    sensors_m.getAddress(&deviceAddress, index);
+  }
+
+  bool SetResolution(int resolution) {
+    return sensors_m.setResolution(&deviceAddress, resolution);
+  }
+
+  bool requestTemp() {
+    return sensors.requestTemperaturesByAddress(&deviceAddress);
+  }
+
+  float temp() {
+   return sensors.getTempC(&deviceAddress);
+  }
+};
+
+DallasTemp **dallas_devices;
+
 float *last_values;
 const long NANTEMP = -100.0;
 
@@ -309,29 +336,18 @@ void setup() {
   client.setCallback(callback);
 
   DeviceAddress dummyAddr;
-  oneWire.search(dummyAddr);
-  oneWire.reset_search();
-
+  oneWire_g.search(dummyAddr);
+  oneWire_g.reset_search();
   sensors.begin();
-  Serial.print("Locating devices...");
   device_count = sensors.getDeviceCount();
-  Serial.printf("count %d devices\n", device_count);
-  sensor_addresses = new DeviceAddress[device_count];
+  Serial.printf("%d Dallas devices\n", device_count);
+  dallas_devices = new DallasTemp *[device_count];
   drows = new DRow *[device_count];
   for (int ii = 0; ii < device_count; ii++) {
-    if (!sensors.getAddress(sensor_addresses[ii], ii))
-      Serial.printf("Unable to find address for Device %d", ii);
-    else
-      Serial.printf("got device %d address %d\n", ii, sensor_addresses[ii]);
-    sensors.setResolution(sensor_addresses[ii], 12);
+    dallas_devices[ii] = new DallasTemp(sensors, ii);
     drows[ii] = new DRow();
   }
-  // report parasite power requirements
-  Serial.print("Parasite power is: ");
-  if (sensors.isParasitePowerMode())
-    Serial.println("ON");
-  else
-    Serial.println("OFF");
+
 
   servos = new CServo *[num_servos];
   for (auto ii = 0; ii < num_servos; ii++) {
@@ -380,9 +396,12 @@ void loop() {
     rtd->read_all();
     Serial.printf("%s, %g\n", DateTime.toISOString().c_str(), rtd->temperature());
 
-    sensors.requestTemperatures();
     for (int snum = 0; snum < device_count; snum++) {
-      float temp = sensors.getTempCByIndex(snum);
+        dallas_devices[snum]->requestTemp();
+    }
+    Serial.printf("getting temp\n");
+    for (int snum = 0; snum < device_count; snum++) {
+      float temp = dallas_devices[snum]->temp();
       // Serial.printf("temp %f %d\n", temp, snum);
       if (temp != DEVICE_DISCONNECTED_C) {
         float diff = drows[snum]->last_temp != NANTEMP
