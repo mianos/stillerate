@@ -74,10 +74,6 @@ QuickPID myPID(&Input, &Output, &Setpoint);
 
 MAX31865_RTD *rtd;
 
-#define HSPI_MISO   26
-#define HSPI_MOSI   27
-#define HSPI_SCLK   25
-#define HSPI_SS     33
 
 static const int spiClk = 1000000; // 10khz // 1 MHz
 SPIClass * hspi = NULL;
@@ -152,7 +148,7 @@ public:
   }
 };
 
-int servo_pins[] = {26, 27};
+int servo_pins[] = {21, 22};
 CServo **servos;
 const int num_servos = sizeof(servo_pins) / sizeof(int);
 
@@ -296,6 +292,7 @@ void setup() {
   DateTime.setTimeZone("AEST-10AEDT,M10.1.0,M4.1.0/3");
   tzset();
 
+#if 0
 	ArduinoOTA
 	.onStart([]() {
       String type;
@@ -323,7 +320,7 @@ void setup() {
     });
 
   ArduinoOTA.begin();
-
+#endif
   tft.init();
   tft.fontHeight(4);
   tft.setRotation(1);
@@ -387,6 +384,11 @@ void setup() {
   }
 
   hspi = new SPIClass(VSPI);
+
+#define HSPI_MISO   26
+#define HSPI_MOSI   27
+#define HSPI_SCLK   25
+#define HSPI_SS     33
 
   hspi->begin(HSPI_SCLK, HSPI_MISO, HSPI_MOSI, HSPI_SS); //SCLK, MISO, MOSI, SS
   auto *spis = new SPISettings(spiClk, MSBFIRST, SPI_MODE3);
@@ -505,5 +507,5 @@ void loop() {
     servos[servo]->do_update_if_needed(servo);
   }
   client.loop();
-  ArduinoOTA.handle();
+//  ArduinoOTA.handle();
 }
