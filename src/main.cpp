@@ -63,19 +63,45 @@ PT100Temp *pt100_device;
 float *last_values;
 const long NANTEMP = -100.0;
 
-// PID vars
-//Define Variables we'll be connecting to
-float Setpoint = 78.4;
-float Input, Output;
+class CPid {
+public:
+  QuickPID pid;
+  float Input, Output;
+  float Setpoint = 78.4;
+  float Kp=2, Ki=5, Kd=0;
+  const float outputSpan = 100;
+  CPid() : pid(&Input, &Output, &Setpoint) {
+//    QuickPID myPID(&Input, &Output, &Setpoint);
+    //turn the PID on
+    pid.SetOutputLimits(0, outputSpan);
+    // myPID.SetMode(myPID.Control::automatic); // the PID is turned on
+    pid.SetMode(pid.Control::manual); // the PID is turned off
+    pid.SetProportionalMode(pid.pMode::pOnError);
+    pid.SetDerivativeMode(pid.dMode::dOnMeas);
+    pid.SetAntiWindupMode(pid.iAwMode::iAwClamp);
+    pid.SetTunings(Kp, Ki, Kd); // set PID gains
+    pid.SetControllerDirection(pid.Action::reverse);
 
-const float outputSpan = 100;
+  }
 
-//Specify the links and initial tuning parameters
-float Kp=2, Ki=5, Kd=0;
+  void SetTunings() {
+     pid.SetTunings(Kp, Ki, Kd);
+  }
 
-QuickPID myPID(&Input, &Output, &Setpoint);
+  void run(bool run) {
+      pid.SetMode(run ? pid.Control::automatic : pid.Control::manual);
+  }
 
+  bool GetMode() {
+    return pid.GetMode() ? true : false;
+  }
 
+  void Compute() {
+    pid.Compute();
+  }
+};
+
+CPid apid;
 
 
 const char *mqtt_server = "mqtt2.mianos.com";
@@ -87,12 +113,12 @@ PubSubClient client(espClient);
 void update_mqtt_pid_output(String reason) {
 		StaticJsonDocument<200> doc;
 		doc["number"] = 0;
-		doc["input"] = Input;
-		doc["output"] = Output;
-		doc["kp"] = Kp;
-		doc["ki"] = Ki;
-		doc["kd"] = Kd;
-		doc["setpoint"] = Setpoint;
+		doc["input"] = apid.Input;
+		doc["output"] = apid.Output;
+		doc["kp"] = apid.Kp;
+		doc["ki"] = apid.Ki;
+		doc["kd"] = apid.Kd;
+		doc["setpoint"] = apid.Setpoint;
 		doc["reason"] = reason;
 		doc["timestamp"] =  DateTime.now();
 		String output;
@@ -171,28 +197,28 @@ void callback(char *topic_str, byte *payload, unsigned int length) {
       }
       if (jpl.containsKey("setpoint")) {
         Serial.printf("setpoint %f\n", jpl["setpoint"].as<float>());
-        Setpoint = (double)jpl["setpoint"];
+        apid.Setpoint = (double)jpl["setpoint"];
       }
       if (jpl.containsKey("run")) {
         Serial.printf("pid control state %s\n", jpl["run"]  ? "on" : "off");
-        myPID.SetMode(jpl["run"] ? myPID.Control::automatic : myPID.Control::manual);
+        apid.run(jpl["run"].as<bool>());
       }
       if (jpl.containsKey("kp")) {
         auto xx = jpl["kp"].as<float>();
         Serial.printf("setting Kp %f\n", xx);
-        Kp = xx;
+        apid.Kp = xx;
       }
       if (jpl.containsKey("ki")) {
         auto xx = jpl["ki"].as<float>();
         Serial.printf("setting Ki %f\n", xx);
-        Ki = xx;
+        apid.Ki = xx;
       }
       if (jpl.containsKey("kd")) {
         auto xx = jpl["kd"].as<float>();
         Serial.printf("setting Kd %f\n", xx);
-        Kd = xx;
+        apid.Kd = xx;
       }
-       myPID.SetTunings(Kp, Ki, Kd);
+      apid.SetTunings();
     } 
   }
 }
@@ -218,8 +244,8 @@ void reconnect() {
       Serial.println("connected");
       // Once connected, publish an announcement...
       StaticJsonDocument<200> doc;
-      doc["setpoint"] = Setpoint;
-      doc["run"] = myPID.GetMode() ? true : false;
+      doc["setpoint"] = apid.Setpoint;
+      doc["run"] = apid.GetMode();
       doc["time"] = DateTime.toISOString();
       String status_topic = "tele/" + String(dname) + "/init";
       String output;
@@ -345,16 +371,6 @@ void setup() {
     servos[ii] = new CServo(servo_pins[ii], dname, client);
   }
 
-  //turn the PID on
-  myPID.SetOutputLimits(0, outputSpan);
-  // myPID.SetMode(myPID.Control::automatic); // the PID is turned on
-  myPID.SetMode(myPID.Control::manual); // the PID is turned off
-  myPID.SetProportionalMode(myPID.pMode::pOnError);
-  myPID.SetDerivativeMode(myPID.dMode::dOnMeas);
-  myPID.SetAntiWindupMode(myPID.iAwMode::iAwClamp);
-  myPID.SetTunings(Kp, Ki, Kd); // set PID gains
-  myPID.SetControllerDirection(myPID.Action::reverse);
-
 }
 
 const int period = 1000;
@@ -440,13 +456,13 @@ void loop() {
   }
   for (int snum = 0; snum < temp_sensor_count; snum++) {
     if (snum == 0) { // sensor 0 under pid control, should be adjustable via config  
-			Input = drows[snum]->temp;
+			apid.Input = drows[snum]->temp;
 
-      myPID.Compute();
+      apid.Compute();
 
       // if automatic pid or tuning set the output
-      if (myPID.GetMode()) {
-        if (servos[snum]->set(Output, snum)) {
+      if (apid.GetMode()) {
+        if (servos[snum]->set(apid.Output, snum)) {
           update_mqtt_pid_output("Speed change");
         }
       }
