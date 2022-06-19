@@ -20,8 +20,10 @@
 #include <ArduinoOTA.h>
 #include <QuickPID.h>
 
+#include "tempsensor.h"
+#include "dallastemp.h"
+#include "pt100temp.h"
 #include "cservo.h"
-#include "MAX31865.h"
 
 const char *dname = "stillerator";
 
@@ -51,68 +53,8 @@ TFT_eSPI tft = TFT_eSPI(135, 240); // Invoke custom library
 OneWire oneWire_g(ONE_WIRE_BUS);
 DallasTemperature sensors(&oneWire_g);
 
-
-
-int device_count = 0;
-
-class TenpSensor {
-public:
-  virtual float temp() = 0;
-  virtual bool requestTemp() = 0;
-};
-
-class DallasTemp :  TenpSensor {
-  int index;
-  DallasTemperature &sensors_m;
-  uint8_t deviceAddress;
-public:
-  DallasTemp(DallasTemperature& sensors_a, int index_a) : sensors_m(sensors_a), index(index_a) {
-    sensors_m.getAddress(&deviceAddress, index);
-  }
-
-  bool SetResolution(int resolution) {
-    return sensors_m.setResolution(&deviceAddress, resolution);
-  }
-
-  bool requestTemp() {
-    return sensors.requestTemperaturesByAddress(&deviceAddress);
-  }
-
-  float temp() {
-   return sensors.getTempC(&deviceAddress);
-  }
-};
-
-DallasTemp **dallas_devices;
-
-#define HSPI_MISO   26
-#define HSPI_MOSI   27
-#define HSPI_SCLK   25
-#define HSPI_SS     33
-
-
-class PT100Temp : TenpSensor {
-  SPIClass *hspi;
-  int ss;
-  SPISettings *spis;
-  MAX31865_RTD *rtd;
-public:
-  PT100Temp(int ss_a=HSPI_SS, int spi_clock=1000000) : ss(ss_a) {
-    hspi = new SPIClass(VSPI);
-    hspi->begin(HSPI_SCLK, HSPI_MISO, HSPI_MOSI, ss); //SCLK, MISO, MOSI, SS
-    spis = new SPISettings(spi_clock, MSBFIRST, SPI_MODE3);
-    rtd = new MAX31865_RTD(MAX31865_RTD::RTD_PT100, ss, hspi, spis);
-    rtd->configure(true, true, false, true, MAX31865_FAULT_DETECTION_NONE, true, true, 0x0000, 0x7fff);
-  }
-
-  bool requestTemp() {
-    return rtd->read_all();
-  }
-
-  float temp() {
-    return rtd->temperature();
-  }
-};
+TempSensor **temp_sensors;
+int temp_sensor_count;
 
 
 PT100Temp *pt100_device;
@@ -294,7 +236,7 @@ struct DRow {
 public:
   DRow() : changed(false), temp(0.0), last_temp(NANTEMP), diff(0.0) {}
 };
-// device_count
+
 DRow **drows;
 
 void setup() {
@@ -369,16 +311,23 @@ void setup() {
   oneWire_g.search(dummyAddr);
   oneWire_g.reset_search();
   sensors.begin();
-  device_count = sensors.getDeviceCount();
-  Serial.printf("%d Dallas devices\n", device_count);
-  dallas_devices = new DallasTemp *[device_count];
-  drows = new DRow *[device_count];
-  for (int ii = 0; ii < device_count; ii++) {
-    dallas_devices[ii] = new DallasTemp(sensors, ii);
+  auto dallas_count = sensors.getDeviceCount();
+  Serial.printf("%d Dallas devices\n", dallas_count);
+
+  temp_sensor_count = dallas_count + 1;
+  temp_sensors = new TempSensor *[temp_sensor_count];
+
+  int tx = 0;
+  for (tx = 0; tx < dallas_count; tx++) {
+    temp_sensors[tx] = new DallasTemp(sensors, tx);
+  }
+  temp_sensors[tx] = new PT100Temp();
+  
+
+  drows = new DRow *[temp_sensor_count];
+  for (auto ii = 0; ii < temp_sensor_count; ii++) {
     drows[ii] = new DRow();
   }
-
-  pt100_device = new PT100Temp();
 
   servos = new CServo *[num_servos];
   for (auto ii = 0; ii < num_servos; ii++) {
@@ -412,20 +361,17 @@ void loop() {
     }
     bool changes = false;
 
-    pt100_device->requestTemp();
-    Serial.printf("%s, %g\n", DateTime.toISOString().c_str(), pt100_device->temp());
 
-    for (int snum = 0; snum < device_count; snum++) {
-        dallas_devices[snum]->requestTemp();
+    for (int snum = 0; snum < temp_sensor_count; snum++) {
+        temp_sensors[snum]->requestTemp();
     }
-    for (int snum = 0; snum < device_count; snum++) {
-      float temp = dallas_devices[snum]->temp();
-      // Serial.printf("temp %f %d\n", temp, snum);
+    for (int snum = 0; snum < temp_sensor_count; snum++) {
+      float temp = temp_sensors[snum]->temp();
       if (temp != DEVICE_DISCONNECTED_C) {
         float diff = drows[snum]->last_temp != NANTEMP
                          ? temp - drows[snum]->last_temp
                          : 0.0;
-        // Serial.printf("sensor %d temp %f diff %f\n", snum, temp, diff);
+        //Serial.printf("sensor %d temp %f diff %f\n", snum, temp, diff);
         if (diff != 0.0) {
           drows[snum]->changed = true;
           drows[snum]->temp = temp;
@@ -439,7 +385,7 @@ void loop() {
     }
     if (changes) {
       tft.fillScreen(TFT_BLACK);
-      for (int snum = 0; snum < device_count; snum++) {
+      for (int snum = 0; snum < temp_sensor_count; snum++) {
         char buff[30];
         snprintf(buff, sizeof(buff), "%1d %0.2f %0.2f", snum, drows[snum]->temp,
                  drows[snum]->diff);
@@ -450,7 +396,7 @@ void loop() {
       tft.drawString(DateTime.format(DateFormatter::TIME_ONLY), 3, 70, 0);
     }
     if (client.connected()) {
-      for (int snum = 0; snum < device_count; snum++) {
+      for (int snum = 0; snum < temp_sensor_count; snum++) {
         if (drows[snum]->temp == NANTEMP) {
           continue;
         }
@@ -474,14 +420,14 @@ void loop() {
         }
       }
     }
-    for (int snum = 0; snum < device_count; snum++) {
+    for (int snum = 0; snum < temp_sensor_count; snum++) {
       if (drows[snum]->temp != NANTEMP) {
         drows[snum]->last_temp = drows[snum]->temp;
       }
       drows[snum]->changed = false;
     }
   }
-  for (int snum = 0; snum < device_count; snum++) {
+  for (int snum = 0; snum < temp_sensor_count; snum++) {
     if (snum == 0) { // sensor 0 under pid control, should be adjustable via config  
 			Input = drows[snum]->temp;
 
