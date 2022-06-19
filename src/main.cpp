@@ -158,6 +158,17 @@ void callback(char *topic_str, byte *payload, unsigned int length) {
       }
       servos[number]->set(speed, number);
     } else if (dest == "pid") {
+      if (jpl.containsKey("config")) {
+        auto cfg = jpl["config"].as<JsonObject>();
+        if (cfg.containsKey("sensor")) {
+          Serial.printf("config sensor %d\n", cfg["sensor"].as<int>());    
+        }
+        if (cfg.containsKey("servo")) {
+            Serial.printf("config servo %d\n", cfg["servo"].as<int>());
+        }
+
+    
+      }
       if (jpl.containsKey("setpoint")) {
         Serial.printf("setpoint %f\n", jpl["setpoint"].as<float>());
         Setpoint = (double)jpl["setpoint"];
