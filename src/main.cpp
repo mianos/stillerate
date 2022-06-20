@@ -18,12 +18,12 @@
 #include <StringSplitter.h>
 #include <WiFiManager.h>
 #include <ArduinoOTA.h>
-#include <QuickPID.h>
 
 #include "tempsensor.h"
 #include "dallastemp.h"
 #include "pt100temp.h"
 #include "cservo.h"
+#include "cpid.h"
 
 const char *dname = "stillerator";
 
@@ -60,46 +60,6 @@ int temp_sensor_count;
 PT100Temp *pt100_device;
 
 
-float *last_values;
-const long NANTEMP = -100.0;
-
-class CPid {
-public:
-  QuickPID pid;
-  float Input, Output;
-  float Setpoint = 78.4;
-  float Kp=2, Ki=5, Kd=0;
-  const float outputSpan = 100;
-  CPid() : pid(&Input, &Output, &Setpoint) {
-//    QuickPID myPID(&Input, &Output, &Setpoint);
-    //turn the PID on
-    pid.SetOutputLimits(0, outputSpan);
-    // myPID.SetMode(myPID.Control::automatic); // the PID is turned on
-    pid.SetMode(pid.Control::manual); // the PID is turned off
-    pid.SetProportionalMode(pid.pMode::pOnError);
-    pid.SetDerivativeMode(pid.dMode::dOnMeas);
-    pid.SetAntiWindupMode(pid.iAwMode::iAwClamp);
-    pid.SetTunings(Kp, Ki, Kd); // set PID gains
-    pid.SetControllerDirection(pid.Action::reverse);
-
-  }
-
-  void SetTunings() {
-     pid.SetTunings(Kp, Ki, Kd);
-  }
-
-  void run(bool run) {
-      pid.SetMode(run ? pid.Control::automatic : pid.Control::manual);
-  }
-
-  bool GetMode() {
-    return pid.GetMode() ? true : false;
-  }
-
-  void Compute() {
-    pid.Compute();
-  }
-};
 
 CPid apid;
 
@@ -109,24 +69,6 @@ const char* ntpServer = "ntp.mianos.com";
 WiFiClient espClient;
 WiFiManager wifiManager;
 PubSubClient client(espClient);
-
-void update_mqtt_pid_output(String reason) {
-		StaticJsonDocument<200> doc;
-		doc["number"] = 0;
-		doc["input"] = apid.Input;
-		doc["output"] = apid.Output;
-		doc["kp"] = apid.Kp;
-		doc["ki"] = apid.Ki;
-		doc["kd"] = apid.Kd;
-		doc["setpoint"] = apid.Setpoint;
-		doc["reason"] = reason;
-		doc["timestamp"] =  DateTime.now();
-		String output;
-		serializeJson(doc, output);
-
-		String tele_topic = String("tele/") + dname + "/pid";
-		client.publish(tele_topic.c_str(), output.c_str());
-}
 
 int servo_pins[] = {22, 21};
 CServo **servos;
@@ -184,42 +126,8 @@ void callback(char *topic_str, byte *payload, unsigned int length) {
       }
       servos[number]->set(speed, number);
     } else if (dest == "pid") {
-      if (jpl.containsKey("config")) {
-        auto cfg = jpl["config"].as<JsonObject>();
-        if (cfg.containsKey("sensor")) {
-          Serial.printf("config sensor %d\n", cfg["sensor"].as<int>());    
-        }
-        if (cfg.containsKey("servo")) {
-            Serial.printf("config servo %d\n", cfg["servo"].as<int>());
-        }
-
-    
-      }
-      if (jpl.containsKey("setpoint")) {
-        Serial.printf("setpoint %f\n", jpl["setpoint"].as<float>());
-        apid.Setpoint = (double)jpl["setpoint"];
-      }
-      if (jpl.containsKey("run")) {
-        Serial.printf("pid control state %s\n", jpl["run"]  ? "on" : "off");
-        apid.run(jpl["run"].as<bool>());
-      }
-      if (jpl.containsKey("kp")) {
-        auto xx = jpl["kp"].as<float>();
-        Serial.printf("setting Kp %f\n", xx);
-        apid.Kp = xx;
-      }
-      if (jpl.containsKey("ki")) {
-        auto xx = jpl["ki"].as<float>();
-        Serial.printf("setting Ki %f\n", xx);
-        apid.Ki = xx;
-      }
-      if (jpl.containsKey("kd")) {
-        auto xx = jpl["kd"].as<float>();
-        Serial.printf("setting Kd %f\n", xx);
-        apid.Kd = xx;
-      }
-      apid.SetTunings();
-    } 
+      apid.ProcessUpdateJson(jpl);
+    }
   }
 }
 
@@ -251,7 +159,7 @@ void reconnect() {
       String output;
       serializeJson(doc, output);
       client.publish(status_topic.c_str(), output.c_str());
-			update_mqtt_pid_output("Reconnect");
+			apid.Publish(client, dname, "Reconnect");
  
     } else {
       Serial.print("failed, rc=");
@@ -456,14 +364,12 @@ void loop() {
   }
   for (int snum = 0; snum < temp_sensor_count; snum++) {
     if (snum == 0) { // sensor 0 under pid control, should be adjustable via config  
-			apid.Input = drows[snum]->temp;
-
-      apid.Compute();
+      auto nval = apid.Calculate(drows[snum]->temp);
 
       // if automatic pid or tuning set the output
       if (apid.GetMode()) {
-        if (servos[snum]->set(apid.Output, snum)) {
-          update_mqtt_pid_output("Speed change");
+        if (servos[snum]->set(nval, snum)) {
+          apid.Publish(client, dname, "Speed change");
         }
       }
     }
