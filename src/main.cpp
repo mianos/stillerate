@@ -59,10 +59,10 @@ int temp_sensor_count;
 
 PT100Temp *pt100_device;
 
-
+const int N_PIDS = 1;
+int input_for_output[N_PIDS];
 
 CPid apid;
-
 
 const char *mqtt_server = "mqtt2.mianos.com";
 const char* ntpServer = "ntp.mianos.com";
@@ -127,6 +127,14 @@ void callback(char *topic_str, byte *payload, unsigned int length) {
       servos[number]->set(speed, number);
     } else if (dest == "pid") {
       apid.ProcessUpdateJson(jpl);
+    } else if (dest == "config") {
+      auto cfg = jpl["config"].as<JsonObject>();
+      if (cfg.containsKey("sensor")) {
+        Serial.printf("config sensor %d\n", cfg["sensor"].as<int>());    
+      }
+      if (cfg.containsKey("servo")) {
+          Serial.printf("config servo %d\n", cfg["servo"].as<int>());
+      }
     }
   }
 }
@@ -152,13 +160,19 @@ void reconnect() {
       Serial.println("connected");
       // Once connected, publish an announcement...
       StaticJsonDocument<200> doc;
+      doc["version"] = 1;
       doc["setpoint"] = apid.Setpoint;
       doc["run"] = apid.GetMode();
       doc["time"] = DateTime.toISOString();
+      for (auto ii = 0; ii < N_PIDS; ii++) {
+        doc["config"]["servo"] = ii;
+        doc["config"]["sensor"] = input_for_output[ii]; 
+      }
       String status_topic = "tele/" + String(dname) + "/init";
       String output;
       serializeJson(doc, output);
       client.publish(status_topic.c_str(), output.c_str());
+      Serial.printf("/init %s\n", output.c_str());
 			apid.Publish(client, dname, "Reconnect");
  
     } else {
@@ -278,7 +292,10 @@ void setup() {
   for (auto ii = 0; ii < num_servos; ii++) {
     servos[ii] = new CServo(servo_pins[ii], dname, client);
   }
-
+  for (auto ii = 0; ii < N_PIDS; ii++) {
+    // note, all outputs are driven by input 1
+    input_for_output[ii] = 1;
+  }
 }
 
 const int period = 1000;
@@ -295,7 +312,6 @@ void loop() {
       reconnect();
     }
     bool changes = false;
-
 
     for (int snum = 0; snum < temp_sensor_count; snum++) {
         temp_sensors[snum]->requestTemp();
@@ -352,6 +368,7 @@ void loop() {
           String tele_topic = String("tele/") + dname + "/temp";
           client.publish(tele_topic.c_str(), output.c_str());
           last_temp_send_time = now;
+          Serial.printf("%s\n", output.c_str());
         }
       }
     }
@@ -363,13 +380,15 @@ void loop() {
     }
   }
   for (int snum = 0; snum < temp_sensor_count; snum++) {
-    if (snum == 0) { // sensor 0 under pid control, should be adjustable via config  
-      auto nval = apid.Calculate(drows[snum]->temp);
+    for (auto outnum = 0; outnum <  N_PIDS; outnum++) {
+      if (input_for_output[outnum] == snum) {
+        auto nval = apid.Calculate(drows[snum]->temp);
 
-      // if automatic pid or tuning set the output
-      if (apid.GetMode()) {
-        if (servos[snum]->set(nval, snum)) {
-          apid.Publish(client, dname, "Speed change");
+        // if automatic pid or tuning set the output
+        if (apid.GetMode()) {
+          if (servos[outnum]->set(nval, snum)) {
+            apid.Publish(client, dname, "Speed change");
+          }
         }
       }
     }

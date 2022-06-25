@@ -1,4 +1,5 @@
 #pragma once
+
 #include <QuickPID.h>
 #include <ArduinoJson.h>
 #include <PubSubClient.h>
@@ -32,6 +33,10 @@ public:
     return Output;
   }
 
+/*  void Compute() {
+    pid.Compute();
+  }
+*/
   void run(bool run) {
       pid.SetMode(run ? pid.Control::automatic : pid.Control::manual);
   }
@@ -40,9 +45,6 @@ public:
     return pid.GetMode() ? true : false;
   }
 
-  void Compute() {
-    pid.Compute();
-  }
 
   void Publish(PubSubClient &client, String dname, String reason) {
 		StaticJsonDocument<200> doc;
@@ -63,15 +65,6 @@ public:
   }
 
   void ProcessUpdateJson(DynamicJsonDocument& jpl) {
-    if (jpl.containsKey("config")) {
-      auto cfg = jpl["config"].as<JsonObject>();
-      if (cfg.containsKey("sensor")) {
-        Serial.printf("config sensor %d\n", cfg["sensor"].as<int>());    
-      }
-      if (cfg.containsKey("servo")) {
-          Serial.printf("config servo %d\n", cfg["servo"].as<int>());
-      }
-    }
     if (jpl.containsKey("setpoint")) {
       Serial.printf("setpoint %f\n", jpl["setpoint"].as<float>());
       Setpoint = (double)jpl["setpoint"];
