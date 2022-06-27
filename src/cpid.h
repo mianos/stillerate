@@ -11,6 +11,7 @@ class CPid {
   QuickPID pid;
   float Input, Output;
   float Kp=2, Ki=5, Kd=0;
+  uint32_t sampletime = 1;
 public:
   float Setpoint = 78.4;
   CPid(float outputSpan=100) : pid(&Input, &Output, &Setpoint) {
@@ -45,7 +46,6 @@ public:
     return pid.GetMode() ? true : false;
   }
 
-
   void Publish(PubSubClient &client, String dname, String reason) {
 		StaticJsonDocument<200> doc;
 		doc["number"] = 0;
@@ -55,6 +55,7 @@ public:
 		doc["ki"] = Ki;
 		doc["kd"] = Kd;
 		doc["setpoint"] = Setpoint;
+		doc["sampletime"] = sampletime;
 		doc["reason"] = reason;
 		doc["timestamp"] =  DateTime.now();
 		String output;
@@ -66,28 +67,29 @@ public:
 
   void ProcessUpdateJson(DynamicJsonDocument& jpl) {
     if (jpl.containsKey("setpoint")) {
-      Serial.printf("setpoint %f\n", jpl["setpoint"].as<float>());
       Setpoint = (double)jpl["setpoint"];
     }
     if (jpl.containsKey("run")) {
-      Serial.printf("pid control state %s\n", jpl["run"]  ? "on" : "off");
       run(jpl["run"].as<bool>());
     }
     if (jpl.containsKey("kp")) {
       auto xx = jpl["kp"].as<float>();
-      Serial.printf("setting Kp %f\n", xx);
       Kp = xx;
+      pid.SetTunings(Kp, Ki, Kd);
     }
     if (jpl.containsKey("ki")) {
       auto xx = jpl["ki"].as<float>();
-      Serial.printf("setting Ki %f\n", xx);
       Ki = xx;
+      pid.SetTunings(Kp, Ki, Kd);
     }
     if (jpl.containsKey("kd")) {
       auto xx = jpl["kd"].as<float>();
-      Serial.printf("setting Kd %f\n", xx);
       Kd = xx;
+      pid.SetTunings(Kp, Ki, Kd);
     }
-    pid.SetTunings(Kp, Ki, Kd);
+    if (jpl.containsKey("sampletime")) {
+      sampletime = jpl["sampletime"].as<int>();
+      pid.SetSampleTimeUs(sampletime * 1000000);
+    }
   } 
 };

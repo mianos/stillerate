@@ -161,7 +161,6 @@ void reconnect() {
       // Once connected, publish an announcement...
       StaticJsonDocument<200> doc;
       doc["version"] = 1;
-      doc["setpoint"] = apid.Setpoint;
       doc["run"] = apid.GetMode();
       doc["time"] = DateTime.toISOString();
       for (auto ii = 0; ii < N_PIDS; ii++) {
