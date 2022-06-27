@@ -357,10 +357,11 @@ void loop() {
           StaticJsonDocument<200> doc;
           doc["sensor"] = snum;
           doc["temp"] = drows[snum]->temp;
-          doc["diff"] = drows[snum]->diff;
           doc["timestamp"] = drows[snum]->receive_time_t;
           if (forced) {
             doc["forced"] = true;
+          } else {
+            doc["diff"] = drows[snum]->diff;
           }
           String output;
           serializeJson(doc, output);
