@@ -297,7 +297,7 @@ void setup() {
   }
 }
 
-const int period = 1000;
+const int period = 100;
 unsigned long last_loop_time;
 const int forced_send_period = 30000;
 
@@ -322,7 +322,7 @@ void loop() {
                          ? temp - drows[snum]->last_temp
                          : 0.0;
         //Serial.printf("sensor %d temp %f diff %f\n", snum, temp, diff);
-        if (diff != 0.0) {
+        if (fabs(diff) > 0.01) {
           drows[snum]->changed = true;
           drows[snum]->temp = temp;
           drows[snum]->diff = diff;

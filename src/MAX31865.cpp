@@ -45,8 +45,6 @@ void MAX31865_RTD::configure(bool v_bias, bool conversion_mode, bool one_shot,
                              uint16_t high_threshold)
 {
   uint8_t control_bits = 0;
-
-  Serial.printf("3 wire %s\n", three_wire ? "yes" : "no");
   /* Assemble the control bit mask. */
   control_bits |= (v_bias ? 0x80 : 0);
   control_bits |= (conversion_mode ? 0x40 : 0);
