@@ -270,7 +270,6 @@ void setup() {
   oneWire_g.reset_search();
   sensors.begin();
   auto dallas_count = sensors.getDeviceCount();
-  Serial.printf("%d Dallas devices\n", dallas_count);
 
   temp_sensor_count = dallas_count + 1;
   temp_sensors = new TempSensor *[temp_sensor_count];

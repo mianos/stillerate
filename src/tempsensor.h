@@ -1,8 +1,13 @@
 #pragma once
+#include "mav.h"
 
 class TempSensor {
+  CMAverage<float> mav{20};
 public:
-  virtual float temp() = 0;
+  virtual float getTemp() = 0;
+  float temp() {
+    return mav.avg(getTemp());
+  }
   virtual bool requestTemp() = 0;
 };
 
