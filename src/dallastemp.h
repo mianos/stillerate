@@ -22,5 +22,8 @@ public:
   float getTemp() {
     return sensors_m.getTempC(&deviceAddress);
   }
+  virtual const char *getType() const {
+    return "ds18b20";
+  }
 };
 

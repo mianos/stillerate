@@ -26,5 +26,8 @@ public:
   virtual float getTemp() {
     return rtd->temperature();
   }
+  virtual const char *getType() const {
+    return "pt100";
+  }
 };
 

@@ -57,7 +57,7 @@ TempSensor **temp_sensors;
 int temp_sensor_count;
 
 
-PT100Temp *pt100_device;
+//PT100Temp *pt100_device;
 
 const int N_PIDS = 1;
 int input_for_output[N_PIDS];
@@ -279,8 +279,10 @@ void setup() {
     temp_sensors[tx] = new DallasTemp(sensors, tx);
   }
   temp_sensors[tx] = new PT100Temp();
-  
 
+  for (auto ii = 0; ii < temp_sensor_count; ii++) {
+    Serial.printf("sensor %d is %s\n", ii, temp_sensors[ii]->getType());
+  }
   drows = new DRow *[temp_sensor_count];
   for (auto ii = 0; ii < temp_sensor_count; ii++) {
     drows[ii] = new DRow();

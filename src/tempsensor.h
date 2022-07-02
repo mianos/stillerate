@@ -9,5 +9,6 @@ public:
     return mav.avg(getTemp());
   }
   virtual bool requestTemp() = 0;
+  virtual const char *getType() const = 0;
 };
 
