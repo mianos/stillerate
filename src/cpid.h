@@ -12,17 +12,15 @@ class CPid {
   float Input, Output;
   float Kp=2, Ki=5, Kd=0;
   uint32_t sampletime = 1;
+  int outputLimit;
 public:
   float Setpoint = 78.4;
-  CPid(float outputSpan=100) : pid(&Input, &Output, &Setpoint) {
-//    QuickPID myPID(&Input, &Output, &Setpoint);
-    //turn the PID on
-    pid.SetOutputLimits(0, outputSpan);
-    // myPID.SetMode(myPID.Control::automatic); // the PID is turned on
+  CPid(float outputLimit_a=100) : outputLimit(outputLimit_a), pid(&Input, &Output, &Setpoint) {
+    pid.SetOutputLimits(0, outputLimit);
     pid.SetMode(pid.Control::manual); // the PID is turned off
-    pid.SetProportionalMode(pid.pMode::pOnError);
-    pid.SetDerivativeMode(pid.dMode::dOnMeas);
-    pid.SetAntiWindupMode(pid.iAwMode::iAwClamp);
+//    pid.SetProportionalMode(pid.pMode::pOnError);
+//    pid.SetDerivativeMode(pid.dMode::dOnMeas);
+//    pid.SetAntiWindupMode(pid.iAwMode::iAwClamp);
     pid.SetTunings(Kp, Ki, Kd); // set PID gains
     pid.SetControllerDirection(pid.Action::reverse);
 
@@ -54,6 +52,7 @@ public:
 		doc["kp"] = Kp;
 		doc["ki"] = Ki;
 		doc["kd"] = Kd;
+		doc["outputLimit"] = outputLimit;
 		doc["setpoint"] = Setpoint;
 		doc["sampletime"] = sampletime;
 		doc["reason"] = reason;
@@ -86,6 +85,10 @@ public:
       auto xx = jpl["kd"].as<float>();
       Kd = xx;
       pid.SetTunings(Kp, Ki, Kd);
+    }
+    if (jpl.containsKey("outputLimit")) {
+      outputLimit = jpl["outputLimit"].as<int>();
+      pid.SetOutputLimits(0, outputLimit);
     }
     if (jpl.containsKey("sampletime")) {
       sampletime = jpl["sampletime"].as<int>();

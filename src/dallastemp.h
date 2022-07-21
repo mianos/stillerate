@@ -20,7 +20,12 @@ public:
   }
 
   float getTemp() {
-    return sensors_m.getTempC(&deviceAddress);
+    auto tempC = sensors_m.getTempC(&deviceAddress);
+    if (tempC < -100.0) {
+      return TooLow;
+    } else {
+      return tempC;
+    }
   }
   virtual const char *getType() const {
     return "ds18b20";

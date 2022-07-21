@@ -191,7 +191,8 @@ struct DRow {
   float diff;
   unsigned long last_temp_send_time;
   time_t receive_time_t;
-public:
+  int errors;
+
   DRow() : changed(false), temp(0.0), last_temp(NANTEMP), diff(0.0) {}
 };
 
@@ -318,7 +319,8 @@ void loop() {
     }
     for (int snum = 0; snum < temp_sensor_count; snum++) {
       float temp = temp_sensors[snum]->temp();
-      if (temp != DEVICE_DISCONNECTED_C) {
+      drows[snum]->errors = temp_sensors[snum]->errors();
+      if (temp != TempSensor::TooLow) {
         float diff = drows[snum]->last_temp != NANTEMP
                          ? temp - drows[snum]->last_temp
                          : 0.0;
@@ -359,6 +361,7 @@ void loop() {
           doc["sensor"] = snum;
           doc["temp"] = drows[snum]->temp;
           doc["timestamp"] = drows[snum]->receive_time_t;
+          doc["errors"] = drows[snum]->errors;
           if (forced) {
             doc["forced"] = true;
           } else {
