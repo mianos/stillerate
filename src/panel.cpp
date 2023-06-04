@@ -17,6 +17,7 @@ static lv_color_t *disp_draw_buf;
 static lv_disp_drv_t disp_drv;
 
 void ta(const char *str) {
+  lv_textarea_add_text(ui_messages, "\n");
   lv_textarea_add_text(ui_messages, str);
   lv_refr_now(NULL);
   delay(1000);
@@ -54,7 +55,6 @@ void initLVGL() {
   lv_init();
   screenWidth = gfx->width();
   screenHeight = gfx->height();
-	Serial.printf("width %d height %d\n", screenWidth, screenHeight);
   disp_draw_buf = (lv_color_t *)heap_caps_malloc(sizeof(lv_color_t) * screenWidth * 32,
                                                  MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
   if (!disp_draw_buf) {

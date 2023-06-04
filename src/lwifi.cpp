@@ -10,29 +10,29 @@
 WiFiManager wifiManager;
 
 void configModeCallback (WiFiManager *myWiFiManager) {
-  ta("Entered config mode\n");
+  ta("Entered config mode");
   char buffer[80];
 
-  sprintf(buffer, "AP IP %s\n", WiFi.softAPIP().toString().c_str());
+  sprintf(buffer, "AP IP %s", WiFi.softAPIP().toString().c_str());
   ta(buffer);
-  sprintf(buffer, "portal ssid %s\n", myWiFiManager->getConfigPortalSSID().c_str());
+  sprintf(buffer, "portal ssid %s", myWiFiManager->getConfigPortalSSID().c_str());
   ta(buffer);
 }
 
 void wifi_connect() {
-  ta("Wifi connect\n");
+  ta("Wifi connect");
   wifiManager.setAPCallback(configModeCallback);
   auto res = wifiManager.autoConnect("stillcontroller");
   if (!res) {
-    ta("Wifi failed to connect\n");
+    ta("Wifi failed to connect");
   } else {
-    ta("Connected\n");
+    ta("Connected");
   }
   DateTime.begin(/* timeout param */);
   if (!DateTime.isTimeValid()) {
-    ta("Failed to get time from server\n");
+    ta("Failed to get time from server");
   } else {
-    ta("Datetime set\n");
+    ta("Datetime set");
   }
 }
 
