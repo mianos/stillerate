@@ -21,7 +21,7 @@ lv_obj_clear_flag( ui_times, LV_OBJ_FLAG_SCROLLABLE );    /// Flags
 ui_clock = lv_label_create(ui_times);
 lv_obj_set_width( ui_clock, LV_SIZE_CONTENT);  /// 1
 lv_obj_set_height( ui_clock, LV_SIZE_CONTENT);   /// 1
-lv_obj_set_x( ui_clock, -3 );
+lv_obj_set_x( ui_clock, 7 );
 lv_obj_set_y( ui_clock, 0 );
 lv_obj_set_align( ui_clock, LV_ALIGN_CENTER );
 lv_label_set_text(ui_clock,"12:34:56");
@@ -38,12 +38,36 @@ ui_mqtton = lv_checkbox_create(ui_times);
 lv_checkbox_set_text(ui_mqtton,"");
 lv_obj_set_width( ui_mqtton, LV_SIZE_CONTENT);  /// 1
 lv_obj_set_height( ui_mqtton, LV_SIZE_CONTENT);   /// 1
-lv_obj_set_x( ui_mqtton, -5 );
-lv_obj_set_y( ui_mqtton, 0 );
+lv_obj_set_x( ui_mqtton, 16 );
+lv_obj_set_y( ui_mqtton, -1 );
 lv_obj_set_align( ui_mqtton, LV_ALIGN_LEFT_MID );
 lv_obj_add_flag( ui_mqtton, LV_OBJ_FLAG_SCROLL_ON_FOCUS );   /// Flags
 
 lv_obj_set_style_border_side(ui_mqtton, LV_BORDER_SIDE_NONE, LV_PART_INDICATOR| LV_STATE_DEFAULT);
+
+ui_timelabel = lv_label_create(ui_times);
+lv_obj_set_width( ui_timelabel, LV_SIZE_CONTENT);  /// 1
+lv_obj_set_height( ui_timelabel, LV_SIZE_CONTENT);   /// 1
+lv_obj_set_x( ui_timelabel, -45 );
+lv_obj_set_y( ui_timelabel, -1 );
+lv_obj_set_align( ui_timelabel, LV_ALIGN_CENTER );
+lv_label_set_text(ui_timelabel,"Time:");
+
+ui_uplabel = lv_label_create(ui_times);
+lv_obj_set_width( ui_uplabel, LV_SIZE_CONTENT);  /// 1
+lv_obj_set_height( ui_uplabel, LV_SIZE_CONTENT);   /// 1
+lv_obj_set_x( ui_uplabel, 51 );
+lv_obj_set_y( ui_uplabel, 0 );
+lv_obj_set_align( ui_uplabel, LV_ALIGN_CENTER );
+lv_label_set_text(ui_uplabel,"Up:");
+
+ui_Label4 = lv_label_create(ui_times);
+lv_obj_set_width( ui_Label4, LV_SIZE_CONTENT);  /// 1
+lv_obj_set_height( ui_Label4, LV_SIZE_CONTENT);   /// 1
+lv_obj_set_x( ui_Label4, -107 );
+lv_obj_set_y( ui_Label4, 0 );
+lv_obj_set_align( ui_Label4, LV_ALIGN_CENTER );
+lv_label_set_text(ui_Label4,"PID");
 
 ui_temp = lv_obj_create(ui_Screen1);
 lv_obj_set_width( ui_temp, 248);
