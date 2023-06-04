@@ -16,6 +16,12 @@ static lv_disp_draw_buf_t draw_buf;
 static lv_color_t *disp_draw_buf;
 static lv_disp_drv_t disp_drv;
 
+void ta(const char *str) {
+  lv_textarea_add_text(ui_messages, str);
+  lv_refr_now(NULL);
+  delay(1000);
+}
+
 /* Display flushing */
 void my_disp_flush(lv_disp_drv_t *disp, const lv_area_t *area, lv_color_t *color_p)
 {
