@@ -90,13 +90,13 @@ lv_obj_set_height( ui_rtemp, LV_SIZE_CONTENT);   /// 1
 lv_obj_set_x( ui_rtemp, -10 );
 lv_obj_set_y( ui_rtemp, 0 );
 lv_obj_set_align( ui_rtemp, LV_ALIGN_LEFT_MID );
-lv_label_set_text(ui_rtemp,"100.99");
+lv_label_set_text(ui_rtemp,"");
 
 ui_rdiff = lv_label_create(ui_treflux);
 lv_obj_set_width( ui_rdiff, LV_SIZE_CONTENT);  /// 1
 lv_obj_set_height( ui_rdiff, LV_SIZE_CONTENT);   /// 1
 lv_obj_set_align( ui_rdiff, LV_ALIGN_CENTER );
-lv_label_set_text(ui_rdiff,"+0.99");
+lv_label_set_text(ui_rdiff,"+0.0");
 
 ui_rtime = lv_label_create(ui_treflux);
 lv_obj_set_width( ui_rtime, LV_SIZE_CONTENT);  /// 1
@@ -104,7 +104,7 @@ lv_obj_set_height( ui_rtime, LV_SIZE_CONTENT);   /// 1
 lv_obj_set_x( ui_rtime, 8 );
 lv_obj_set_y( ui_rtime, 0 );
 lv_obj_set_align( ui_rtime, LV_ALIGN_RIGHT_MID );
-lv_label_set_text(ui_rtime,"999");
+lv_label_set_text(ui_rtime,"0");
 
 ui_tboiler = lv_obj_create(ui_temp);
 lv_obj_set_width( ui_tboiler, 146);
@@ -119,13 +119,13 @@ lv_obj_set_height( ui_btemp, LV_SIZE_CONTENT);   /// 1
 lv_obj_set_x( ui_btemp, -10 );
 lv_obj_set_y( ui_btemp, 0 );
 lv_obj_set_align( ui_btemp, LV_ALIGN_LEFT_MID );
-lv_label_set_text(ui_btemp,"100.99");
+lv_label_set_text(ui_btemp,"");
 
 ui_bdiff = lv_label_create(ui_tboiler);
 lv_obj_set_width( ui_bdiff, LV_SIZE_CONTENT);  /// 1
 lv_obj_set_height( ui_bdiff, LV_SIZE_CONTENT);   /// 1
 lv_obj_set_align( ui_bdiff, LV_ALIGN_CENTER );
-lv_label_set_text(ui_bdiff,"+0.99");
+lv_label_set_text(ui_bdiff,"+0.0");
 
 ui_btime = lv_label_create(ui_tboiler);
 lv_obj_set_width( ui_btime, LV_SIZE_CONTENT);  /// 1
@@ -133,7 +133,7 @@ lv_obj_set_height( ui_btime, LV_SIZE_CONTENT);   /// 1
 lv_obj_set_x( ui_btime, 8 );
 lv_obj_set_y( ui_btime, 0 );
 lv_obj_set_align( ui_btime, LV_ALIGN_RIGHT_MID );
-lv_label_set_text(ui_btime,"999");
+lv_label_set_text(ui_btime,"0");
 
 ui_Label1 = lv_label_create(ui_temp);
 lv_obj_set_width( ui_Label1, LV_SIZE_CONTENT);  /// 1
