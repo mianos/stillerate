@@ -23,6 +23,17 @@ void ta(const char *str) {
   delay(1000);
 }
 
+constexpr int MAX_STRING_SIZE = 120;
+
+void taf(const char *format, ...) {
+    char str[MAX_STRING_SIZE];
+    va_list args;
+    va_start(args, format);
+    vsnprintf(str, MAX_STRING_SIZE, format, args);
+    va_end(args);
+    ta(str);
+}
+
 /* Display flushing */
 void my_disp_flush(lv_disp_drv_t *disp, const lv_area_t *area, lv_color_t *color_p)
 {

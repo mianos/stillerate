@@ -25,7 +25,7 @@ TempSensor **temp_sensors;
 int temp_sensor_count;
 DRow **drows;
 
-void init_temp_sensors() {
+int init_temp_sensors() {
   DeviceAddress dummyAddr;
   oneWire_g.search(dummyAddr);
   oneWire_g.reset_search();
@@ -37,13 +37,13 @@ void init_temp_sensors() {
   for (auto tx = 0; tx < dallas_count; tx++) {
     if (temp_sensor_count > max_temp_count) {
       ta("max sensor count exceeded");
-      return;
+      return temp_sensor_count - 1;
     }
     temp_sensors[temp_sensor_count++] = new DallasTemp(sensors, tx);
   }
   if (temp_sensor_count > max_temp_count) {
     ta("max sensor count exceeded");
-    return;
+    return temp_sensor_count - 1;
   }
   temp_sensors[temp_sensor_count++] = new PT100Temp();
 
@@ -51,6 +51,7 @@ void init_temp_sensors() {
   for (auto ii = 0; ii < temp_sensor_count; ii++) {
     drows[ii] = new DRow();
   }
+  return temp_sensor_count;
 }
 
 void setup()
@@ -60,7 +61,8 @@ void setup()
   DateTime.setTimeZone("AEST-10AEDT,M10.1.0,M4.1.0/3");
   tzset();
   wifi_connect();
-  init_temp_sensors();
+  auto sensor_count = init_temp_sensors();
+  mqtt_init(sensor_count);
 }
 
 void SetTimes() {
@@ -117,10 +119,10 @@ void loop() {
           temp_sensors[snum]->requestTemp();
         } else {
           changes = drows[snum]->Update(temp_sensors[snum]->getTemp(), snum);
+          display();
         }
       }
-      display();
-      handle_mqtt(changes, drows, temp_sensor_count);
+      handle_mqtt(drows, temp_sensor_count);
       for (auto snum = 0; snum < temp_sensor_count; snum++) {
          drows[snum]->ResetChanged();
       }
