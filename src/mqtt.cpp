@@ -3,9 +3,11 @@
 #include <PubSubClient.h>
 #include <ArduinoJson.h>
 #include <WiFi.h>
+#include <StringSplitter.h>
 
 #include "drow.hpp"
 #include "panel.h"
+#include "cservo.hpp"
 
 WiFiClient espClient;
 PubSubClient client(espClient);
@@ -41,8 +43,6 @@ void reconnect() {
       String output;
       serializeJson(doc, output);
       client.publish(status_topic.c_str(), output.c_str());
-      ta("/init ");
-      ta(output.c_str());
 //			apid.Publish(client, dname, "Reconnect");
 #endif
     } else {
@@ -89,14 +89,91 @@ void handle_mqtt(DRow **drows, const int temp_sensor_count) {
       mqtt_sent[snum] = DateTime.now();
     }
   }
+  client.loop();
 }
  
 const char *mqtt_server = "mqtt2.mianos.com";
 
 void callback(char *topic_str, byte *payload, unsigned int length) {
+  //taf("Message arrived, topic '%s'", topic_str);
   auto topic = String(topic_str);
 
-  taf("Message arrived, topic '%s'\n", topic_str);
+  auto splitter = StringSplitter(topic, '/', 4); // new StringSplitter(string_to_split, delimiter, limit)
+  int itemCount = splitter.getItemCount();
+  if (itemCount < 3) {
+    taf("Item count less than 3 %d '%s'", itemCount, topic_str);
+    return;
+  }
+#if 0
+  for (int i = 0; i < itemCount; i++) {
+    String item = splitter.getItemAtIndex(i);
+    taf("Item '%s' index %d", item.c_str(), i);
+  }
+#endif
+  if (splitter.getItemAtIndex(0) == "cmnd") {
+    DynamicJsonDocument jpl(1024);
+    auto err = deserializeJson(jpl, payload, length);
+    if (err) {
+      taf("deserializeJson() failed: '%s'", err.c_str());
+    }
+#if 0
+    else {
+      String output;
+      serializeJson(jpl, output);
+      taf("payload '%s'", output.c_str());
+    }
+#endif
+    auto dest = splitter.getItemAtIndex(2);
+    taf("dest '%s'", dest.c_str());
+    if (dest == "pump") {
+      if (!jpl.containsKey("number")) {
+        ta("Does not contain a pump number");
+        return;
+      }
+      if (!jpl.containsKey("speed")) {
+        ta("Does not contain a pump speed");
+        return;
+      }
+      auto speed = jpl["speed"].as<unsigned int>();
+      auto number = jpl["number"].as<unsigned int>();
+      set_speed(number, speed);
+    }
+  }
+#if 0
+      else if (dest == "pid") {
+      apid.ProcessUpdateJson(jpl);
+    } else if (dest == "config") {
+      auto config_id = -1;
+      if (jpl.containsKey("config")) {
+        config_id = jpl["config"].as<int>();
+      }
+      if (jpl.containsKey("sensor")) {
+        Serial.printf("config sensor %d\n", jpl["sensor"].as<int>());    
+      }
+      if (jpl.containsKey("servo")) {
+          Serial.printf("config servo %d\n", jpl["servo"].as<int>());
+      }
+      if (config_id == -1) {
+        Serial.printf("no config id for minmap\n");
+        return;
+      }
+      for (auto ii = 0; ii < num_servos; ii++) {
+        if (ii == config_id) {
+          if (jpl.containsKey("minmap")) {
+            servos[ii]->set_minmap(jpl["minmap"].as<int>());
+          }
+          if (jpl.containsKey("fullspeed")) {
+            servos[ii]->full_speed();
+          }
+          if (jpl.containsKey("fullstop")) {
+            servos[ii]->full_stop();
+          }
+        }
+      }
+    }
+  }
+  apid.Publish(client, dname, "config change");
+#endif
 }
 
 void mqtt_init(int sensor_count) {

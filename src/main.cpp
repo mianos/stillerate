@@ -13,6 +13,7 @@
 #include "pt100temp.h"
 #include "drow.hpp"
 #include "mqtt.hpp"
+#include "cservo.hpp"
 
 
 #define ONE_WIRE_BUS GPIO_NUM_13
@@ -62,6 +63,7 @@ void setup()
   tzset();
   wifi_connect();
   auto sensor_count = init_temp_sensors();
+  servo_init();
   mqtt_init(sensor_count);
 }
 
@@ -127,6 +129,7 @@ void loop() {
          drows[snum]->ResetChanged();
       }
       lcount++;
+      ta_display();
 			lastUpdate = millis();
 	}
 	lv_task_handler();

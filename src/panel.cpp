@@ -1,10 +1,13 @@
 #include <Arduino_GFX_Library.h>
 #include <lvgl.h>
+#include <LinkedList.h>
 
 #include "ui.h"
 
 #define GFX_BL 4
 
+
+LinkedList<char *> dtext = LinkedList<char *>();
 
 Arduino_DataBus *bus = new Arduino_ESP32SPI(16 /* DC */, 5 /* CS */, 18 /* SCK */, 19 /* MOSI */, -1 /* MISO */);
 Arduino_GFX *gfx = new Arduino_ST7789(bus, 23 /* RST */, 1 /* rotation */, true /* IPS */, 135 /* width */, 240 /* height */, 52 /* col offset 1 */, 40 /* row offset 1 */, 53 /* col offset 2 */, 40 /* row offset 2 */);
@@ -17,10 +20,17 @@ static lv_color_t *disp_draw_buf;
 static lv_disp_drv_t disp_drv;
 
 void ta(const char *str) {
-  lv_textarea_add_text(ui_messages, "\n");
-  lv_textarea_add_text(ui_messages, str);
-  lv_refr_now(NULL);
-  delay(1000);
+  dtext.add(0, strdup(str));
+}
+
+void ta_display() {
+  if (dtext.size()) {
+    auto str = dtext.pop();
+    lv_textarea_add_text(ui_messages, "\n");
+    lv_textarea_add_text(ui_messages, str);
+    lv_refr_now(NULL);
+    free(str);
+  }
 }
 
 constexpr int MAX_STRING_SIZE = 120;
