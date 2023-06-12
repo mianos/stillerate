@@ -24,6 +24,7 @@ struct PLoop {
     apid.setWindUpLimits(-10, 10); // Groth bounds for the integral term to prevent integral wind-up
     apid.start();
   }
+
   void start() {
     apid.start();
   }
@@ -32,7 +33,7 @@ struct PLoop {
     apid.stop();
   }
 
-  double handle_pid(PLoop *pl, DRow *drow) {
+  double handle() {
     if (!drow->isValid()) {
       return output;
     }

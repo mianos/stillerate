@@ -26,6 +26,7 @@ static const int max_temp_count = 2;
 TempSensor **temp_sensors;
 int temp_sensor_count;
 DRow **drows;
+PLoop *pid;
 
 int init_temp_sensors() {
   DeviceAddress dummyAddr;
@@ -64,8 +65,9 @@ void setup()
   tzset();
   wifi_connect();
   auto sensor_count = init_temp_sensors();
-  servo_init();
   mqtt_init(sensor_count);
+  pid = new PLoop(drows[1]);
+  servo_init();
 }
 
 void SetTimes() {
@@ -112,6 +114,7 @@ void display() {
       }
     }
 }
+
 void loop() {
 	if (millis() - lastUpdate > 100) {
       SetTimes();
@@ -126,7 +129,7 @@ void loop() {
         }
       }
       handle_mqtt(drows, temp_sensor_count);
-      // handle_pid(drows[1]);
+      set_speed(0, pid->handle());
       for (auto snum = 0; snum < temp_sensor_count; snum++) {
          drows[snum]->ResetChanged();
       }
