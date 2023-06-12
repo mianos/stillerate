@@ -19,32 +19,40 @@ struct DRow {
 
   DRow() {}
   void ResetChanged() {
-    this->changed = false;
+    changed = false;
   }
-  bool  Update(const float temp, int snum) {
+
+  bool isValid() {
     if (temp <= TempSensor::TooLow || temp > TempSensor::TooHigh) {
           return false;
     }
-    if (this->temp_set_time) {
-      this->time_at_this_temp = DateTime.now() - this->temp_set_time;
-    } else {
-      this->time_at_this_temp = 0;
-    }
-    // Serial.printf("temp id %d is %.2f %ul\n", snum, temp, this->time_at_this_temp);
-    this->temp = temp;
-    this->receive_time_t = DateTime.now();
+    return true;
+  }
 
-    if (this->last_temp_sent == TempSensor::TooLow || fabs(temp - this->last_temp_sent) > delta) {
-      auto diff = temp - this->last_temp_sent;
+  bool  Update(const float in_temp, int snum) {
+    if (!isValid()) {
+      return false;
+    }
+    if (temp_set_time) {
+      time_at_this_temp = DateTime.now() - temp_set_time;
+    } else {
+      time_at_this_temp = 0;
+    }
+    // Serial.printf("temp id %d is %.2f %ul\n", snum, in_temp, time_at_this_temp);
+    temp = in_temp;
+    receive_time_t = DateTime.now();
+
+    if (last_temp_sent == TempSensor::TooLow || fabs(temp - last_temp_sent) > delta) {
+      auto diff = temp - last_temp_sent;
       if (diff < 10.0) {
-        this->diff = diff;
+        diff = diff;
       }
-      this->last_temp_sent = temp;
-      this->temp_set_time = DateTime.now();
-      this->changed = true;
+      last_temp_sent = temp;
+      temp_set_time = DateTime.now();
+      changed = true;
       return true;
     } else {
-      this->changed = false;
+      changed = false;
       return false;
     }
   }

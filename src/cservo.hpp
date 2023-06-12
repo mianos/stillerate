@@ -7,11 +7,13 @@ class CServo {
   int pin;
   int minimum;
   int snum;
+  bool inverse;
+  static constexpr int max_speed = 255;
 public:
 
   bool set_speed(int new_speed) {
     if (new_speed != speed) {
-      auto tw = map(new_speed, 0, 255, minimum, 255);
+      auto tw = this->inverse ? max_speed - new_speed : new_speed;
       taf("servo %d to raw %d", this->snum, tw);
       analogWrite(pin, tw);
       speed = new_speed;
@@ -21,16 +23,20 @@ public:
     }
   }
 
-  CServo(int pin, int minimum, int snum) : pin(pin), minimum(minimum), snum(snum) {
+  CServo(int pin, int minimum, int snum, bool inverse=true) : pin(pin), minimum(minimum), snum(snum), inverse(inverse) {
     pinMode(pin, OUTPUT);
-    set_speed(speed);
+    if (inverse) {
+      set_speed(max_speed);
+    } else {
+      set_speed(0);
+    }
   }
 
-  void full_speed() {
+  void raw_full_speed() {
     set_speed(255);
   }
 
-  void full_stop() {
+  void raw_full_stop() {
     set_speed(0);
   }
 };
