@@ -20,6 +20,7 @@ const char *dname = "stillerator";
 void reconnect() {
   // Loop until we're reconnected
   while (!client.connected()) {
+    lv_obj_clear_state(ui_pidon, LV_STATE_CHECKED);
     ta("Attempting MQTT connection...");
     // Create a random client ID
     String clientId = "stillerator-";
@@ -32,27 +33,23 @@ void reconnect() {
 
       ta("mqtt connected");
       // Once connected, publish an announcement...
-#if 1
+
       StaticJsonDocument<200> doc;
       doc["version"] = 2;
-//      doc["run"] = apid.GetMode();
+      doc["run"] = ploop->getMode();
       doc["time"] = DateTime.toISOString();
-//      for (auto ii = 0; ii < N_PIDS; ii++) {
-//        doc["config"]["servo"] = ii;
-//        doc["config"]["sensor"] = input_for_output[ii]; 
-//      }
       String status_topic = "tele/" + String(dname) + "/init";
       String output;
       serializeJson(doc, output);
       client.publish(status_topic.c_str(), output.c_str());
-//			apid.Publish(client, dname, "Reconnect");
-#endif
+
     } else {
       taf("failed, rc=%d, sleeping 5 seconds", client.state());
       // Wait 5 seconds before retrying
       delay(5000);
     }
   }
+  lv_obj_add_state(ui_mqtton, LV_STATE_CHECKED); 
 }
 
 
@@ -139,6 +136,9 @@ void callback(char *topic_str, byte *payload, unsigned int length) {
       auto speed = jpl["speed"].as<unsigned int>();
       auto number = jpl["number"].as<unsigned int>();
       set_speed(number, speed);
+      if (number == R_MOTOR) {
+        ploop->set_output((double)speed);
+      }
     } else if (dest == "pid") {
       ploop->ProcessUpdateJson(jpl);
     }

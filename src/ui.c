@@ -31,7 +31,7 @@ lv_obj_t *ui_Label1;
 lv_obj_t *ui_Label2;
 lv_obj_t *ui_motorpanel;
 lv_obj_t *ui_rspeed;
-lv_obj_t *ui_;
+lv_obj_t *ui_pidon;
 lv_obj_t *ui_messages;
 lv_obj_t *ui____initial_actions0;
 

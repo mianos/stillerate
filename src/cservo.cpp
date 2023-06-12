@@ -10,11 +10,14 @@ int num_servos() {
   return NUM_SERVOS;
 }
 
-void servo_init() {
+void servo_init(int initial_speed) {
   servos = new CServo *[NUM_SERVOS];
   for (auto ii = 0; ii < NUM_SERVOS; ii++) {
     // 10 is the minimum servo value
-    servos[ii] = new CServo(servo_pins[ii], 10, ii);
+    if (ii != R_MOTOR) {
+      initial_speed = CServo::max_speed;
+    }
+    servos[ii] = new CServo(servo_pins[ii], 10, ii, initial_speed);
   }
 }
 

@@ -3,48 +3,70 @@
 #include <PubSubClient.h>
 #include <ArduPID.h>
 
-#include "drow.hpp"
 #include "panel.h"
 
+class PidWithError : public ArduPID {
+public:
+  double getError() {
+    return curError;
+  }
+  bool getMode() {
+    return modeType == ON ? true : false;
+  }
+};
+
 struct PLoop {
-  ArduPID apid;
+  PidWithError  apid;
 
   double input;
   double output;
+  double prev_output;
   double setpoint = 78.4;
   double p = 0.1;
   double i = 0.04;
   double d = 0.0;
-  DRow *drow;
 
-  PLoop(DRow *drow) : drow(drow) {
+  PLoop() {
     apid.begin(&input, &output, &setpoint, p, i, d);
+    set_output(0.0);
+    stop();
 
     // apid.reverse()               // Uncomment if controller output is "reversed"
     // apid.setSampleTime(10);      // OPTIONAL - will ensure at least 10ms have past between successful compute() calls
     apid.setOutputLimits(0, 250);
     apid.setBias(255.0 / 2.0);
     apid.setWindUpLimits(-10, 10); // Groth bounds for the integral term to prevent integral wind-up
-    apid.start();
+  }
+
+  bool getMode() {
+    return apid.getMode();
   }
 
   void start() {
     apid.start();
+    lv_obj_add_state(ui_pidon, LV_STATE_CHECKED); 
     ta("PID start");
   }
 
   void stop() {
     apid.stop();
+    lv_obj_clear_state(ui_pidon, LV_STATE_CHECKED);
     ta("PID stop");
   }
 
-  double handle() {
-    if (!drow->isValid()) {
-      return output;
-    }
-    input = drow->temp;
+  double handle(double temp) {
+    input = temp;
     apid.compute();
+    if (prev_output != output) {
+      Serial.printf("change %g to %g\n", output, prev_output);
+      prev_output = output;
+    }
     return output;
+  }
+
+  void set_output(double new_output) {
+    output = new_output;
+    prev_output = output;
   }
 
   void ProcessUpdateJson(DynamicJsonDocument& jpl) {

@@ -47,7 +47,7 @@ extern lv_obj_t *ui_Label1;
 extern lv_obj_t *ui_Label2;
 extern lv_obj_t *ui_motorpanel;
 extern lv_obj_t *ui_rspeed;
-extern lv_obj_t *ui_;
+extern lv_obj_t *ui_pidon;
 extern lv_obj_t *ui_messages;
 extern lv_obj_t *ui____initial_actions0;
 

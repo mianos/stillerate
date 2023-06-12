@@ -67,7 +67,7 @@ lv_obj_set_height( ui_Label4, LV_SIZE_CONTENT);   /// 1
 lv_obj_set_x( ui_Label4, -107 );
 lv_obj_set_y( ui_Label4, 0 );
 lv_obj_set_align( ui_Label4, LV_ALIGN_CENTER );
-lv_label_set_text(ui_Label4,"PID");
+lv_label_set_text(ui_Label4,"Cq");
 
 ui_temp = lv_obj_create(ui_Screen1);
 lv_obj_set_width( ui_temp, 248);
@@ -165,18 +165,18 @@ lv_obj_set_height( ui_rspeed, LV_SIZE_CONTENT);   /// 1
 lv_obj_set_x( ui_rspeed, 0 );
 lv_obj_set_y( ui_rspeed, -8 );
 lv_obj_set_align( ui_rspeed, LV_ALIGN_CENTER );
-lv_label_set_text(ui_rspeed,"255");
+lv_label_set_text(ui_rspeed,"	");
 
-ui_ = lv_checkbox_create(ui_motorpanel);
-lv_checkbox_set_text(ui_,"");
-lv_obj_set_width( ui_, LV_SIZE_CONTENT);  /// 1
-lv_obj_set_height( ui_, LV_SIZE_CONTENT);   /// 1
-lv_obj_set_x( ui_, 3 );
-lv_obj_set_y( ui_, 9 );
-lv_obj_set_align( ui_, LV_ALIGN_CENTER );
-lv_obj_add_flag( ui_, LV_OBJ_FLAG_SCROLL_ON_FOCUS );   /// Flags
+ui_pidon = lv_checkbox_create(ui_motorpanel);
+lv_checkbox_set_text(ui_pidon,"");
+lv_obj_set_width( ui_pidon, LV_SIZE_CONTENT);  /// 1
+lv_obj_set_height( ui_pidon, LV_SIZE_CONTENT);   /// 1
+lv_obj_set_x( ui_pidon, 3 );
+lv_obj_set_y( ui_pidon, 9 );
+lv_obj_set_align( ui_pidon, LV_ALIGN_CENTER );
+lv_obj_add_flag( ui_pidon, LV_OBJ_FLAG_SCROLL_ON_FOCUS );   /// Flags
 
-lv_obj_set_style_border_side(ui_, LV_BORDER_SIDE_NONE, LV_PART_INDICATOR| LV_STATE_DEFAULT);
+lv_obj_set_style_border_side(ui_pidon, LV_BORDER_SIDE_NONE, LV_PART_INDICATOR| LV_STATE_DEFAULT);
 
 ui_messages = lv_textarea_create(ui_Screen1);
 lv_obj_set_width( ui_messages, 248);

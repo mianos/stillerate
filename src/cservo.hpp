@@ -1,20 +1,29 @@
 #pragma once
 #include "panel.h"
+#include "ui.h"
+
+constexpr int R_MOTOR = 0;
 
 class CServo {
-  int speed = 0;
+public:
+  static constexpr int max_speed = 255;
+private:
+  int speed = 255;    // initialise to max to it gets changed to 0 and displayed
   const char *dname;
   int pin;
   int minimum;
   int snum;
   bool inverse;
-  static constexpr int max_speed = 255;
 public:
 
   bool set_speed(int new_speed) {
     if (new_speed != speed) {
+      if (snum == R_MOTOR) {
+        char buffer[20];
+        sprintf(buffer, "%d", new_speed);
+        lv_label_set_text(ui_rspeed, buffer);
+      }
       auto tw = this->inverse ? max_speed - new_speed : new_speed;
-      taf("servo %d to raw %d", this->snum, tw);
       analogWrite(pin, tw);
       speed = new_speed;
       return true;
@@ -23,17 +32,13 @@ public:
     }
   }
 
-  CServo(int pin, int minimum, int snum, bool inverse=true) : pin(pin), minimum(minimum), snum(snum), inverse(inverse) {
+  CServo(int pin, int minimum, int snum, int initial_speed, bool inverse=true) : pin(pin), minimum(minimum), snum(snum), inverse(inverse) {
     pinMode(pin, OUTPUT);
-    if (inverse) {
-      set_speed(max_speed);
-    } else {
-      set_speed(0);
-    }
+    set_speed(initial_speed);
   }
 
   void raw_full_speed() {
-    set_speed(255);
+    set_speed(max_speed);
   }
 
   void raw_full_stop() {
@@ -41,6 +46,6 @@ public:
   }
 };
 
-extern void servo_init();
+extern void servo_init(int initial_speed);
 extern int num_servos();
 extern void set_speed(int snum, int speed);

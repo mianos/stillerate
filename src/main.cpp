@@ -65,9 +65,9 @@ void setup()
   tzset();
   wifi_connect();
   auto sensor_count = init_temp_sensors();
-  pid = new PLoop(drows[1]);
+  pid = new PLoop();
   mqtt_init(sensor_count, pid);
-  servo_init();
+  servo_init((int)pid->output);
 }
 
 void SetTimes() {
@@ -130,7 +130,9 @@ void loop() {
         }
       }
       handle_mqtt(drows, temp_sensor_count);
-      //set_speed(0, pid->handle());
+      if (drows[1]->isValid()) {
+        set_speed(R_MOTOR, (int)pid->handle(drows[1]->temp));
+      }
       for (auto snum = 0; snum < temp_sensor_count; snum++) {
          drows[snum]->ResetChanged();
       }
