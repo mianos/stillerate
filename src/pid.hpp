@@ -20,7 +20,6 @@ struct PLoop {
 
   double input;
   double output;
-  double prev_output;
   double setpoint = 78.4;
   double p = 0.1;
   double i = 0.04;
@@ -34,8 +33,8 @@ struct PLoop {
     // apid.reverse()               // Uncomment if controller output is "reversed"
     // apid.setSampleTime(10);      // OPTIONAL - will ensure at least 10ms have past between successful compute() calls
     apid.setOutputLimits(0, 250);
-    apid.setBias(255.0 / 2.0);
-    apid.setWindUpLimits(-10, 10); // Groth bounds for the integral term to prevent integral wind-up
+    apid.setBias(0); // 255.0 / 2.0);
+//    apid.setWindUpLimits(-10, 10); // Groth bounds for the integral term to prevent integral wind-up
   }
 
   bool getMode() {
@@ -57,21 +56,17 @@ struct PLoop {
   double handle(double temp) {
     input = temp;
     apid.compute();
-    if (prev_output != output) {
-      Serial.printf("change %g to %g\n", output, prev_output);
-      prev_output = output;
-    }
     return output;
   }
 
   void set_output(double new_output) {
     output = new_output;
-    prev_output = output;
   }
 
   void ProcessUpdateJson(DynamicJsonDocument& jpl) {
     if (jpl.containsKey("setpoint")) {
       setpoint = (double)jpl["setpoint"];
+      taf("setpoint %g", setpoint);
     }
     if (jpl.containsKey("mode")) {
       auto mode =jpl["mode"].as<bool>();
@@ -83,12 +78,15 @@ struct PLoop {
     }
     if (jpl.containsKey("kp")) {
       p = jpl["kp"].as<float>();
+      taf("set p to %g", p);
     }
     if (jpl.containsKey("ki")) {
       i = jpl["ki"].as<float>();
+      taf("set i to %g", i);
     }
     if (jpl.containsKey("kd")) {
       d = jpl["kd"].as<float>();
+      taf("set d to %g", d);
     }
   } 
 };

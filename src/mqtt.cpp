@@ -90,6 +90,27 @@ void handle_mqtt(DRow **drows, const int temp_sensor_count) {
   }
   client.loop();
 }
+
+void send_pid_info() {
+  if (!client.connected()) {
+    reconnect();
+  }
+  static double prev_output;
+  if (ploop->getMode() && ploop->output != prev_output) {
+    StaticJsonDocument<200> doc;
+
+    doc["input"] = ploop->input;
+    doc["output"] = ploop->output;
+    doc["error"] = ploop->apid.getError();
+    doc["timestamp"] = DateTime.now();
+    prev_output = ploop->output;
+
+    String status_topic = "tele/" + String(dname) + "/pid";
+    String output;
+    serializeJson(doc, output);
+    client.publish(status_topic.c_str(), output.c_str());
+  }
+}
  
 const char *mqtt_server = "mqtt2.mianos.com";
 
@@ -115,7 +136,7 @@ void callback(char *topic_str, byte *payload, unsigned int length) {
     if (err) {
       taf("deserializeJson() failed: '%s'", err.c_str());
     }
-#if 1
+#if 0
     else {
       String output;
       serializeJson(jpl, output);
@@ -123,7 +144,7 @@ void callback(char *topic_str, byte *payload, unsigned int length) {
     }
 #endif
     auto dest = splitter.getItemAtIndex(2);
-    taf("dest '%s'", dest.c_str());
+//    taf("dest '%s'", dest.c_str());
     if (dest == "pump") {
       if (!jpl.containsKey("number")) {
         ta("Does not contain a pump number");

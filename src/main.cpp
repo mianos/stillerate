@@ -131,7 +131,9 @@ void loop() {
       }
       handle_mqtt(drows, temp_sensor_count);
       if (drows[1]->isValid()) {
-        set_speed(R_MOTOR, (int)pid->handle(drows[1]->temp));
+        auto new_speed = (int)pid->handle(drows[1]->temp);
+        send_pid_info();
+        set_speed(R_MOTOR, new_speed);
       }
       for (auto snum = 0; snum < temp_sensor_count; snum++) {
          drows[snum]->ResetChanged();
