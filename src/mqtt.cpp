@@ -8,9 +8,11 @@
 #include "drow.hpp"
 #include "panel.h"
 #include "cservo.hpp"
+#include "pid.hpp"
 
 WiFiClient espClient;
 PubSubClient client(espClient);
+PLoop *ploop;
 
 const char *dname = "stillerator";
 
@@ -116,7 +118,7 @@ void callback(char *topic_str, byte *payload, unsigned int length) {
     if (err) {
       taf("deserializeJson() failed: '%s'", err.c_str());
     }
-#if 0
+#if 1
     else {
       String output;
       serializeJson(jpl, output);
@@ -137,6 +139,8 @@ void callback(char *topic_str, byte *payload, unsigned int length) {
       auto speed = jpl["speed"].as<unsigned int>();
       auto number = jpl["number"].as<unsigned int>();
       set_speed(number, speed);
+    } else if (dest == "pid") {
+      ploop->ProcessUpdateJson(jpl);
     }
   }
 #if 0
@@ -176,9 +180,10 @@ void callback(char *topic_str, byte *payload, unsigned int length) {
 #endif
 }
 
-void mqtt_init(int sensor_count) {
+void mqtt_init(int sensor_count, PLoop *pid) {
   mqtt_sent = new long int[sensor_count];
   client.setServer(mqtt_server, 1883);
   client.setCallback(callback);
+  ploop = pid;
 }
 

@@ -65,8 +65,8 @@ void setup()
   tzset();
   wifi_connect();
   auto sensor_count = init_temp_sensors();
-  mqtt_init(sensor_count);
   pid = new PLoop(drows[1]);
+  mqtt_init(sensor_count, pid);
   servo_init();
 }
 
@@ -87,8 +87,9 @@ void display() {
     char temp_b[10];
     char diff_b[10];
     char time_at_temp_b[10];
+
     for (auto snum = 0; snum < temp_sensor_count; snum++) {
-      if (drows[snum]->temp == TempSensor::TooLow) {
+      if (!drows[snum]->isValid()) {
         continue;
       }
 #if 0
@@ -129,7 +130,7 @@ void loop() {
         }
       }
       handle_mqtt(drows, temp_sensor_count);
-      set_speed(0, pid->handle());
+      //set_speed(0, pid->handle());
       for (auto snum = 0; snum < temp_sensor_count; snum++) {
          drows[snum]->ResetChanged();
       }

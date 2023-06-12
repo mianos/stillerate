@@ -30,15 +30,15 @@ struct DRow {
   }
 
   bool  Update(const float in_temp, int snum) {
-    if (!isValid()) {
-      return false;
+    if (in_temp <= TempSensor::TooLow || in_temp > TempSensor::TooHigh) {
+          return false;
     }
     if (temp_set_time) {
       time_at_this_temp = DateTime.now() - temp_set_time;
     } else {
       time_at_this_temp = 0;
     }
-    // Serial.printf("temp id %d is %.2f %ul\n", snum, in_temp, time_at_this_temp);
+    //Serial.printf("temp id %d is %.2f %ul\n", snum, in_temp, time_at_this_temp);
     temp = in_temp;
     receive_time_t = DateTime.now();
 

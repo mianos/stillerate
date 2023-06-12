@@ -1,7 +1,10 @@
 #pragma once
-#include "ArduPID.h"
+#include <ArduinoJson.h>
+#include <PubSubClient.h>
+#include <ArduPID.h>
 
 #include "drow.hpp"
+#include "panel.h"
 
 struct PLoop {
   ArduPID apid;
@@ -27,10 +30,12 @@ struct PLoop {
 
   void start() {
     apid.start();
+    ta("PID start");
   }
 
   void stop() {
     apid.stop();
+    ta("PID stop");
   }
 
   double handle() {
@@ -41,4 +46,27 @@ struct PLoop {
     apid.compute();
     return output;
   }
+
+  void ProcessUpdateJson(DynamicJsonDocument& jpl) {
+    if (jpl.containsKey("setpoint")) {
+      setpoint = (double)jpl["setpoint"];
+    }
+    if (jpl.containsKey("mode")) {
+      auto mode =jpl["mode"].as<bool>();
+      if (mode) {
+        start();
+      } else {
+        stop();
+      }
+    }
+    if (jpl.containsKey("kp")) {
+      p = jpl["kp"].as<float>();
+    }
+    if (jpl.containsKey("ki")) {
+      i = jpl["ki"].as<float>();
+    }
+    if (jpl.containsKey("kd")) {
+      d = jpl["kd"].as<float>();
+    }
+  } 
 };
