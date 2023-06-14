@@ -25,16 +25,16 @@ struct PLoop {
   double i = 0.04;
   double d = 0.0;
 
-  PLoop() {
+  PLoop(double output_limit=250) {
     apid.begin(&input, &output, &setpoint, p, i, d);
     set_output(0.0);
     stop();
 
     // apid.reverse()               // Uncomment if controller output is "reversed"
     // apid.setSampleTime(10);      // OPTIONAL - will ensure at least 10ms have past between successful compute() calls
-    apid.setOutputLimits(0, 250);
+    apid.setOutputLimits(0, output_limit);
     apid.setBias(0); // 255.0 / 2.0);
-//    apid.setWindUpLimits(-10, 10); // Groth bounds for the integral term to prevent integral wind-up
+    apid.setWindUpLimits(-10, 10); // Groth bounds for the integral term to prevent integral wind-up
   }
 
   bool getMode() {
@@ -63,30 +63,54 @@ struct PLoop {
     output = new_output;
   }
 
-  void ProcessUpdateJson(DynamicJsonDocument& jpl) {
+  void BuildSettingsToSend(StaticJsonDocument<200>& doc) {
+      doc["run"] = apid.getMode();
+      doc["setpoint"] = setpoint;
+      doc["kp"] = p;
+      doc["ki"] = i;
+      doc["kd"] = d;
+  }
+
+  bool ProcessUpdateJson(DynamicJsonDocument& jpl) {
     if (jpl.containsKey("setpoint")) {
       setpoint = (double)jpl["setpoint"];
       taf("setpoint %g", setpoint);
     }
-    if (jpl.containsKey("mode")) {
-      auto mode =jpl["mode"].as<bool>();
-      if (mode) {
+    if (jpl.containsKey("run")) {
+      auto run = jpl["run"].as<bool>();
+      if (run == apid.getMode()) {
+        return false;
+      }
+      if (run) {
         start();
       } else {
         stop();
       }
     }
     if (jpl.containsKey("kp")) {
-      p = jpl["kp"].as<float>();
+      auto tp = jpl["kp"].as<float>();
+      if (p == tp) {
+        return false;
+      }
+      p = tp;
       taf("set p to %g", p);
     }
     if (jpl.containsKey("ki")) {
-      i = jpl["ki"].as<float>();
+      auto ti = jpl["ki"].as<float>();
+      if (i == ti) {
+        return false;
+      }
+      i = ti;
       taf("set i to %g", i);
     }
     if (jpl.containsKey("kd")) {
-      d = jpl["kd"].as<float>();
+      auto td = jpl["kd"].as<float>();
+      if (d == td) {
+        return false;
+      }
+      d = td;
       taf("set d to %g", d);
     }
+    return true;
   } 
 };

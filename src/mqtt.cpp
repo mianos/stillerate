@@ -13,6 +13,7 @@
 WiFiClient espClient;
 PubSubClient client(espClient);
 PLoop *ploop;
+static bool publish_settings;
 
 const char *dname = "stillerator";
 
@@ -36,13 +37,12 @@ void reconnect() {
 
       StaticJsonDocument<200> doc;
       doc["version"] = 2;
-      doc["run"] = ploop->getMode();
       doc["time"] = DateTime.toISOString();
       String status_topic = "tele/" + String(dname) + "/init";
       String output;
       serializeJson(doc, output);
       client.publish(status_topic.c_str(), output.c_str());
-
+      publish_settings = true;
     } else {
       taf("failed, rc=%d, sleeping 5 seconds", client.state());
       // Wait 5 seconds before retrying
@@ -51,6 +51,7 @@ void reconnect() {
   }
   lv_obj_add_state(ui_mqtton, LV_STATE_CHECKED); 
 }
+
 
 
 void mqtt_send(bool forced, DRow *dr, int snum) {
@@ -65,8 +66,29 @@ void mqtt_send(bool forced, DRow *dr, int snum) {
   }
   String output;
   serializeJson(doc, output);
-  String tele_topic = String("tele/") + dname + "/temp";
-  client.publish(tele_topic.c_str(), output.c_str());
+  String topic = String("tele/") + dname + "/temp";
+  client.publish(topic.c_str(), output.c_str());
+
+  if (publish_settings) {
+    StaticJsonDocument<200> sdoc;
+    ploop->BuildSettingsToSend(sdoc);
+    String o2;
+    serializeJson(sdoc, o2);
+    String t2 = String("tele/") + dname + "/pidconfig";
+    client.publish(t2.c_str(), o2.c_str());
+    publish_settings = false;
+  }
+}
+
+void  publish_speed_change(int motor, int new_speed) {
+  StaticJsonDocument<200> doc;
+  doc["number"] = motor;
+  doc["speed"] = new_speed;
+  doc["timestamp"] = DateTime.now();
+  String output;
+  serializeJson(doc, output);
+  String topic = String("tele/") + dname + "/pump";
+  client.publish(topic.c_str(), output.c_str());
 }
 
 time_t *mqtt_sent;
@@ -161,44 +183,11 @@ void callback(char *topic_str, byte *payload, unsigned int length) {
         ploop->set_output((double)speed);
       }
     } else if (dest == "pid") {
-      ploop->ProcessUpdateJson(jpl);
-    }
-  }
-#if 0
-      else if (dest == "pid") {
-      apid.ProcessUpdateJson(jpl);
-    } else if (dest == "config") {
-      auto config_id = -1;
-      if (jpl.containsKey("config")) {
-        config_id = jpl["config"].as<int>();
-      }
-      if (jpl.containsKey("sensor")) {
-        Serial.printf("config sensor %d\n", jpl["sensor"].as<int>());    
-      }
-      if (jpl.containsKey("servo")) {
-          Serial.printf("config servo %d\n", jpl["servo"].as<int>());
-      }
-      if (config_id == -1) {
-        Serial.printf("no config id for minmap\n");
-        return;
-      }
-      for (auto ii = 0; ii < num_servos; ii++) {
-        if (ii == config_id) {
-          if (jpl.containsKey("minmap")) {
-            servos[ii]->set_minmap(jpl["minmap"].as<int>());
-          }
-          if (jpl.containsKey("fullspeed")) {
-            servos[ii]->full_speed();
-          }
-          if (jpl.containsKey("fullstop")) {
-            servos[ii]->full_stop();
-          }
-        }
+      if (ploop->ProcessUpdateJson(jpl)) {
+        publish_settings = true;
       }
     }
   }
-  apid.Publish(client, dname, "config change");
-#endif
 }
 
 void mqtt_init(int sensor_count, PLoop *pid) {

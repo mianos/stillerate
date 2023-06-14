@@ -22,14 +22,14 @@ void servo_init(int initial_speed) {
 }
 
 
-void set_speed(int snum, int speed) {
+bool set_speed(int snum, int speed) {
   if (snum < 0 || snum >= NUM_SERVOS) {
     taf("Invalid pump number %d", snum);
-    return;
+    return false;
   }
   if (speed < 0) {
     taf("Invalid speed snum %d", speed);
-    return;
+    return false;
   }
-  servos[snum]->set_speed(speed);
+  return servos[snum]->set_speed(speed);
 }

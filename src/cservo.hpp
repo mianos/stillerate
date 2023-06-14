@@ -48,4 +48,4 @@ public:
 
 extern void servo_init(int initial_speed);
 extern int num_servos();
-extern void set_speed(int snum, int speed);
+extern bool set_speed(int snum, int speed);
