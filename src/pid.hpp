@@ -24,6 +24,10 @@ struct PLoop {
   double p = 0.1;
   double i = 0.04;
   double d = 0.0;
+  double windupMax = 1000;
+  double windupMin = -1000;
+  double sampleTime = 10000;
+  int   run_state = false;
 
   PLoop(double output_limit=250) {
     apid.begin(&input, &output, &setpoint, p, i, d);
@@ -31,10 +35,10 @@ struct PLoop {
     stop();
 
     // apid.reverse()               // Uncomment if controller output is "reversed"
-    // apid.setSampleTime(10);      // OPTIONAL - will ensure at least 10ms have past between successful compute() calls
+    apid.setSampleTime(sampleTime);      // OPTIONAL - will ensure at least 10ms have past between successful compute() calls
     apid.setOutputLimits(0, output_limit);
     apid.setBias(0); // 255.0 / 2.0);
-    apid.setWindUpLimits(-10, 10); // Groth bounds for the integral term to prevent integral wind-up
+    apid.setWindUpLimits(windupMin, windupMax); // Groth bounds for the integral term to prevent integral wind-up
   }
 
   bool getMode() {
@@ -55,7 +59,18 @@ struct PLoop {
 
   double handle(double temp) {
     input = temp;
+    auto old_output = output;
     apid.compute();
+    if (output != old_output) {
+      Serial.printf("change input %g out %g\n", input, output);
+		 apid.debug(&Serial, "myController", PRINT_INPUT    | // Can include or comment out any of these terms to print
+                                              PRINT_OUTPUT   | // in the Serial plotter
+                                              PRINT_SETPOINT |
+                                              PRINT_BIAS     |
+                                              PRINT_P        |
+                                              PRINT_I        |
+                                              PRINT_D);
+    }
     return output;
   }
 
@@ -69,48 +84,80 @@ struct PLoop {
       doc["kp"] = p;
       doc["ki"] = i;
       doc["kd"] = d;
+      doc["windup_min"] = windupMin;
+      doc["windup_max"] = windupMax;
+      doc["sample_time"] = sampleTime;;
   }
 
-  bool ProcessUpdateJson(DynamicJsonDocument& jpl) {
+  int ProcessUpdateJson(DynamicJsonDocument& jpl) {
+    auto changes = 0;
     if (jpl.containsKey("setpoint")) {
-      setpoint = (double)jpl["setpoint"];
-      taf("setpoint %g", setpoint);
+     auto sp = (double)jpl["setpoint"];
+      if (setpoint != sp) {
+        setpoint = sp;
+        changes++;
+      }
     }
     if (jpl.containsKey("run")) {
       auto run = jpl["run"].as<bool>();
-      if (run == apid.getMode()) {
-        return false;
-      }
-      if (run) {
-        start();
-      } else {
-        stop();
+      if (run != apid.getMode()) {
+        if (run) {
+          start();
+        } else {
+          stop();
+        }
+        changes++;
       }
     }
     if (jpl.containsKey("kp")) {
       auto tp = jpl["kp"].as<float>();
-      if (p == tp) {
-        return false;
+      if (p != tp) {
+        p = tp;
+        apid.setCoefficients(p, i, d);
+        changes++;
       }
-      p = tp;
-      taf("set p to %g", p);
     }
     if (jpl.containsKey("ki")) {
       auto ti = jpl["ki"].as<float>();
-      if (i == ti) {
-        return false;
-      }
-      i = ti;
-      taf("set i to %g", i);
+      if (i != ti) {
+        i = ti;
+        apid.setCoefficients(p, i, d);
+				Serial.printf("set to %g\n", i);
+        changes++;
+      } 
     }
     if (jpl.containsKey("kd")) {
       auto td = jpl["kd"].as<float>();
-      if (d == td) {
-        return false;
+      if (d != td) {
+        d = td;
+        apid.setCoefficients(p, i, d);
+        changes++;
       }
-      d = td;
-      taf("set d to %g", d);
     }
-    return true;
+    if (jpl.containsKey("windup_min")) {
+      auto wum = jpl["windup_min"].as<float>();
+      if (windupMin != wum) {
+        windupMin = wum;
+        apid.setWindUpLimits(windupMin, windupMax); 
+        changes++;
+      }
+    }
+    if (jpl.containsKey("windup_max")) {
+      auto wux = jpl["windup_max"].as<float>();
+      if (windupMax != wux) {
+        windupMax = wux;
+        apid.setWindUpLimits(windupMin, windupMax); 
+        changes++;
+      }
+    }
+    if (jpl.containsKey("sample_time")) {
+      auto st = jpl["sample_time"].as<float>();
+      if (sampleTime != st) {
+        sampleTime = st;
+        apid.setSampleTime(sampleTime);
+        changes++;
+      }
+    }
+    return changes;
   } 
 };

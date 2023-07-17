@@ -166,8 +166,27 @@ void callback(char *topic_str, byte *payload, unsigned int length) {
     }
 #endif
     auto dest = splitter.getItemAtIndex(2);
-//    taf("dest '%s'", dest.c_str());
-    if (dest == "pump") {
+    // Serial.printf("dest '%s'\n", dest.c_str());
+    if (dest == "temp") {
+      if (!jpl.containsKey("number")) {
+        ta("emulated temp set does not  not contain a sensor number number");
+        return;
+      }
+      auto number = jpl["number"].as<unsigned int>();
+      if (number < 0 || number >= temp_sensor_count) {
+        taf("temp no %d invalid", number);
+        return;
+      }
+      if (jpl.containsKey("emulation")) {
+        auto emulation = jpl["emulation"].as<bool>();
+        temp_sensors[number]->emulationMode(emulation);
+        taf("emulation mode %s", emulation ? "on" : "off");
+      }
+      if (jpl.containsKey("temp")) {
+        auto temp = jpl["temp"].as<double>();
+        temp_sensors[number]->setEmulatedTemp(temp);
+      }
+    } else if (dest == "pump") {
       if (!jpl.containsKey("number")) {
         ta("Does not contain a pump number");
         return;
@@ -183,9 +202,14 @@ void callback(char *topic_str, byte *payload, unsigned int length) {
         ploop->set_output((double)speed);
       }
     } else if (dest == "pid") {
+      String output;
+      serializeJson(jpl, output);
+      Serial.printf("payload '%s'", output.c_str());
       if (ploop->ProcessUpdateJson(jpl)) {
         publish_settings = true;
       }
+    } else if (dest = "report") {
+        publish_settings = true;
     }
   }
 }

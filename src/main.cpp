@@ -125,7 +125,7 @@ void loop() {
         if (!(lcount & 1)) {
           temp_sensors[snum]->requestTemp();
         } else {
-          changes = drows[snum]->Update(temp_sensors[snum]->getTemp(), snum);
+          changes = drows[snum]->Update(temp_sensors[snum]->temp(), snum);
           display();
         }
       }
