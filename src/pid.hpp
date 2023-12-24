@@ -28,6 +28,7 @@ struct PLoop {
   double windupMin = -1000;
   double sampleTime = 10000;
   int   run_state = false;
+  int settings_serial = 0;
 
   PLoop(double output_limit=250) {
     apid.begin(&input, &output, &setpoint, p, i, d);
@@ -87,6 +88,7 @@ struct PLoop {
       doc["windup_min"] = windupMin;
       doc["windup_max"] = windupMax;
       doc["sample_time"] = sampleTime;;
+      doc["setttings_serial"] = settings_serial;;
   }
 
   int ProcessUpdateJson(DynamicJsonDocument& jpl) {
@@ -155,6 +157,13 @@ struct PLoop {
       if (sampleTime != st) {
         sampleTime = st;
         apid.setSampleTime(sampleTime);
+        changes++;
+      }
+    }
+    if (jpl.containsKey("settings_serial")) {
+      auto ss = jpl["settings_serial"].as<int>();
+      if (settings_serial != ss) {
+        settings_serial = ss;
         changes++;
       }
     }

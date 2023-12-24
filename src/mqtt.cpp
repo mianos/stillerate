@@ -157,6 +157,7 @@ void callback(char *topic_str, byte *payload, unsigned int length) {
     auto err = deserializeJson(jpl, payload, length);
     if (err) {
       taf("deserializeJson() failed: '%s'", err.c_str());
+      printf("payload '%s' topic '%s'\n", payload, topic_str);
     }
 #if 0
     else {
@@ -204,7 +205,7 @@ void callback(char *topic_str, byte *payload, unsigned int length) {
     } else if (dest == "pid") {
       String output;
       serializeJson(jpl, output);
-      Serial.printf("payload '%s'", output.c_str());
+      Serial.printf("PID payload '%s\n'", output.c_str());
       if (ploop->ProcessUpdateJson(jpl)) {
         publish_settings = true;
       }
